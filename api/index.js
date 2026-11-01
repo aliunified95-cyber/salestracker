@@ -52,10 +52,11 @@ export default async function handler(req,res){
    await sb('/auth/v1/user',{method:'PUT',token,body:{password:b.pin}});await sb(`/rest/v1/tracker_profiles?id=eq.${user.id}`,{method:'PATCH',admin:true,body:{must_change_pin:false}});return res.status(200).json({ok:true});}
   if(profile.must_change_pin)return res.status(403).json({error:'Please change your temporary PIN first'});
   if(route==='state'&&req.method==='GET'){
-   const allRows=async t=>{const result=[];for(let offset=0;;offset+=1000){const rows=await sb(`/rest/v1/${t}?select=*&order=${t==='tracker_targets'?'agent_id,month':t==='tracker_team_targets'?'month':'id'}&limit=1000&offset=${offset}`,{token});result.push(...rows);if(rows.length<1000)return result}};
-   const [profiles,sales,targets,rules,teamTargets]=await Promise.all(['tracker_profiles','tracker_sales','tracker_targets','tracker_rules','tracker_team_targets'].map(allRows));
-   return res.status(200).json({profiles,sales,targets,rules,teamTargets});
+   const allRows=async t=>{const result=[];for(let offset=0;;offset+=1000){const rows=await sb(`/rest/v1/${t}?select=*&order=${t==='tracker_targets'?'agent_id,month':['tracker_team_targets','tracker_team_arpu'].includes(t)?'month':'id'}&limit=1000&offset=${offset}`,{token});result.push(...rows);if(rows.length<1000)return result}};
+   const [profiles,sales,targets,rules,teamTargets,teamArpu]=await Promise.all(['tracker_profiles','tracker_sales','tracker_targets','tracker_rules','tracker_team_targets','tracker_team_arpu'].map(allRows));
+   return res.status(200).json({profiles,sales,targets,rules,teamTargets,teamArpu});
   }
+  if(route==='team-arpu'&&post){if(!['manager','admin'].includes(profile.role))return res.status(403).json({error:'Rules access required'});if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(b.month))throw new Error('Choose a valid month');const record={};for(const k of ['postpaidArpu','mbbArpu','fiberArpu','hbbArpu']){if(typeof b[k]!=='number'||!Number.isFinite(b[k])||b[k]<=0)throw new Error('Enter a value above zero for each ARPU');record[k]=b[k]}await sb('/rest/v1/tracker_team_arpu?on_conflict=month',{method:'POST',token,body:{month:b.month,record},prefer:'resolution=merge-duplicates,return=representation'});return res.status(200).json({ok:true})}
   if(route==='team-target'&&post){
    if(profile.role!=='manager')return res.status(403).json({error:'Manager access required'});
    if(!['sum','manual'].includes(b.mode))return res.status(400).json({error:'Choose combined or custom team targets'});

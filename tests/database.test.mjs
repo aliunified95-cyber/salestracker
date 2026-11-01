@@ -14,6 +14,7 @@ test('Database rules, snapshots and agent isolation',async t=>{
  await db.exec(await readFile('database/schema.sql','utf8'));
  await db.exec(await readFile('database/team-targets.sql','utf8'));
  await db.exec(await readFile('database/admin-role.sql','utf8'));
+ await db.exec(await readFile('database/team-arpu.sql','utf8'));
  await t.test('service limiter counts attempts and blocks the ninth',async()=>{
   await db.exec('set role service_role');
   for(let n=1;n<=9;n++)assert.equal((await query('select tracker_attempt($1) as allowed',['test-bucket'])).rows[0].allowed,n<=8);
@@ -50,6 +51,7 @@ test('Database rules, snapshots and agent isolation',async t=>{
  });
  await t.test('database ignores forged points and rule IDs',async()=>{const r=await query('select record from tracker_sales where id=\'mine\'');assert.equal(r.rows[0].record.points,1.5);assert.equal(r.rows[0].record.pointsAtSale,1.5)});
  await t.test('upgrade uses sale month ARPU without rounding',async()=>{await sale('upgrade',1,{...base,orderNo:'upgrade',saleType:'upgrade',previousRental:10,newRental:15});const r=await query('select record from tracker_sales where id=\'upgrade\'');assert.equal(r.rows[0].record.points,.625);assert.equal(r.rows[0].record.arpuAtSale,8)});
+ await t.test('team ARPU overrides legacy per-agent settings and agent cannot change it',async()=>{await assert.rejects(query('insert into tracker_team_arpu values($1,$2)',['2026-10',JSON.stringify({postpaidArpu:10,mbbArpu:10,fiberArpu:10,hbbArpu:10})]),/row-level security/);await as(0);await query('insert into tracker_team_arpu values($1,$2)',['2026-10',JSON.stringify({postpaidArpu:10,mbbArpu:10,fiberArpu:10,hbbArpu:10})]);await as(1);await sale('team-upgrade',1,{...base,orderNo:'team-upgrade',saleType:'upgrade',previousRental:10,newRental:15});assert.equal((await query("select record from tracker_sales where id='team-upgrade'")).rows[0].record.points,.5);assert.equal((await query("select record from tracker_sales where id='upgrade'")).rows[0].record.points,.625)});
  await t.test('upgrades require ARPU and positive rental increase',async()=>{
   await assert.rejects(sale('missing-month',1,{...base,orderNo:'missing-month',date:'2026-11-01',saleType:'upgrade',previousRental:10,newRental:20}),/ARPU/);
   await assert.rejects(sale('bad-upgrade',1,{...base,orderNo:'bad-upgrade',saleType:'upgrade',previousRental:20,newRental:10}),/exceed/);

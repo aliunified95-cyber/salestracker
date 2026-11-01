@@ -40,10 +40,9 @@ function applyView(){
  S=stateFor(selectedAgent);snapshot=clone(S);const manager=profile.role==='manager',all=selectedAgent==='all';
  document.querySelector('#managerPanel').hidden=!manager;
  document.querySelector('#teamTargetNote').hidden=!manager;
- document.querySelector('#bTarget').hidden=!manager||all;document.querySelector('#bTeamTarget').hidden=!manager||!all;document.querySelector('#bRules').hidden=!manager&&profile.role!=='admin';document.querySelector('#bRestore').hidden=!manager;
+ document.querySelector('#bTarget').hidden=!manager||all;document.querySelector('#bTeamTarget').hidden=!manager||!all;document.querySelector('#bRules').hidden=!manager&&profile.role!=='admin';
  document.querySelector('#bImportTargets').hidden=!manager||!all;
- document.querySelector('#bTarget').disabled=all;document.querySelector('#bNew').disabled=all;document.querySelector('#bRestore').disabled=all;
- document.querySelector('#bBackup').disabled=all;
+ document.querySelector('#bTarget').disabled=all;document.querySelector('#bNew').disabled=all;
  document.querySelector('#pageTitle').textContent=all?'Team performance · AM791':selectedAgent===profile.id?'My performance':(raw.profiles.find(p=>p.id===selectedAgent)?.display_name||'Agent')+' · Performance';
  document.querySelector('#accountName').textContent=profile.username+' · '+profile.role;
  document.querySelector('#app').classList.toggle('team-view',all);
@@ -114,6 +113,9 @@ async function start(){
  document.querySelector('#pinDialog').addEventListener('cancel',e=>{if(profile.must_change_pin)e.preventDefault()});
  document.querySelector('#pinForm').onsubmit=async e=>{e.preventDefault();const pin=document.querySelector('#newPin').value;if(pin!==document.querySelector('#confirmPin').value)return document.querySelector('#pinError').textContent='The PINs do not match';try{await api('pin',{currentPin:document.querySelector('#currentPin').value,pin});document.querySelector('#pinForm').reset();document.querySelector('#pinDialog').close();profile.must_change_pin=false;await signedIn(profile);toast('PIN updated')}catch(e){document.querySelector('#pinError').textContent=e.message}};
  document.querySelector('#manageUsers').onclick=()=>{userList();document.querySelector('#usersDialog').showModal()};
+ const fillArpu=()=>{const rec=raw.teamArpu?.find(x=>x.month===document.querySelector('#arpuMonth').value)?.record||{};for(const [id,key] of [['arpuPost','postpaidArpu'],['arpuMbb','mbbArpu'],['arpuFiber','fiberArpu'],['arpuHbb','hbbArpu']])document.getElementById(id).value=rec[key]??''};
+ document.querySelector('#bRules').addEventListener('click',()=>{document.querySelector('#arpuMonth').value=view;fillArpu()});document.querySelector('#arpuMonth').onchange=fillArpu;
+ document.querySelector('#teamArpuForm').onsubmit=async e=>{e.preventDefault();const unlock=lockMutations();if(!unlock)return;try{await api('team-arpu',{month:document.querySelector('#arpuMonth').value,postpaidArpu:Number(document.querySelector('#arpuPost').value),mbbArpu:Number(document.querySelector('#arpuMbb').value),fiberArpu:Number(document.querySelector('#arpuFiber').value),hbbArpu:Number(document.querySelector('#arpuHbb').value)});await reload();fillArpu();toast('Team ARPU saved')}catch(e){document.querySelector('#arpuError').textContent=e.message}finally{unlock()}};
  document.querySelector('#bTeamTarget').onclick=()=>{document.querySelector('#teamMonth').value=view;fillTeamTarget();document.querySelector('#teamTargetError').textContent='';document.querySelector('#teamTargetDialog').showModal()};
  document.querySelector('#bImportTargets').onclick=()=>{document.querySelector('#targetImportMonth').value=view;document.querySelector('#targetImportError').textContent='';document.querySelector('#targetImportDialog').showModal()};
  document.querySelector('#targetImportForm').onsubmit=async e=>{e.preventDefault();let changes;const month=document.querySelector('#targetImportMonth').value;try{changes=targetImportChanges(document.querySelector('#targetImportText').value,month,raw.profiles,raw.targets)}catch(e){document.querySelector('#targetImportError').textContent=e.message;return}const unlock=lockMutations();if(!unlock)return;try{await api('save',{changes});view=month;await reload();document.querySelector('#targetImportText').value='';document.querySelector('#targetImportDialog').close();toast(`${changes.length} agent targets saved`)}catch(e){document.querySelector('#targetImportError').textContent=e.message}finally{unlock()}};
@@ -244,7 +246,7 @@ const ARPU_INPUT={postpaidArpu:'#tPostArpu',hbbArpu:'#tHbbArpu',mbbArpu:'#tMbbAr
 const arpuName=seg=>ARPU_NAME[ARPU_FIELD[seg]];
 const arpuMsg=seg=>`Please set the monthly ARPU for this category before adding an upgrade. Missing: ${arpuName(seg)} ARPU.`;
 /* ARPU always comes from the month of the sale date, not the month being viewed */
-const getArpu=(date,seg)=>(S.targets[mKey(date)]||{})[ARPU_FIELD[seg]];
+const getArpu=(date,seg)=>(raw.teamArpu?.find(x=>x.month===mKey(date))?.record||S.targets[mKey(date)]||{})[ARPU_FIELD[seg]];
 function upCalc(){
   const seg=$('#fSeg').value,d=$('#fDate').value,pr=parseFloat($('#fPrev').value),nx=parseFloat($('#fNext').value),arpu=seg&&d?getArpu(d,seg):undefined;
   const o=editId&&S.sales.find(x=>x.id===editId);
@@ -350,17 +352,7 @@ $('#bCsv').onclick=()=>{
     ...S.sales.slice().sort((a,b)=>a.date.localeCompare(b.date)||a.createdAt-b.createdAt).map(x=>{const up=x.saleType==='upgrade';return [x.date,x.orderNo,x.msisdn,catOf(x.segment),x.segment,up?'Upgrade':'New Sale',up?'':x.rental,x.previousRental??'',x.newRental??'',x.arpuAtSale??'',x.points,x.ruleId??'',x.ruleEffectiveFrom??'']})];
   dl(`sales-${today()}.csv`,'text/csv','\ufeff'+lines.map(r=>r.map(qt).join(',')).join('\r\n'));
 };
-$('#bBackup').onclick=()=>dl(`sales-backup-${today()}.json`,'application/json',JSON.stringify(S,null,2));
-$('#bRestore').onclick=()=>$('#file').click();
-$('#file').onchange=async e=>{
- const file=e.target.files[0];e.target.value='';if(!file)return;
- if(profile.role!=='manager'||selectedAgent==='all')return toast('Select an agent to import a backup','err');
- let backup;try{backup=JSON.parse(await file.text())}catch{return toast('Invalid backup file','err')}
- if(!backup||!Array.isArray(backup.sales)||!backup.targets)return toast('Invalid backup file','err');
- ask(`Replace this agent's sales and targets with ${backup.sales.length} historical sales? Team rules will stay unchanged.`,'Import backup',async()=>{
-  try{await api('import',{agent:selectedAgent,backup});await reload();toast('Historical backup imported')}catch(e){toast(e.message,'err')}
- });
-};
+
 
 /* ===== sales rules (source of truth for New Sale points) ===== */
 function getApplicableRule(seg,rent,date){ // latest effectiveFrom <= sale date among active rules

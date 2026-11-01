@@ -50,9 +50,9 @@
   <footer>
     <span>Data</span>
     <button class="btn sm" id="bCsv">Export CSV</button>
-    <button class="btn sm" id="bBackup">Backup Data</button>
-    <button class="btn sm" id="bRestore">Restore Data</button>
-    <input type="file" id="file" accept=".json,application/json" hidden>
+
+
+
   </footer>
 </div>
 
@@ -95,7 +95,7 @@
 <dialog id="dRules" style="width:min(860px,calc(100% - 24px))">
   <div class="ch"><h2 style="margin:0">Sales Rules</h2><button class="btn pri" id="bAddRule">+ Add Rule</button></div>
   <p class="sub" style="margin:0 0 10px">New Sale points come from these rules. A sale uses the latest rule effective on its sale date, and saved sales keep the points they were saved with.</p>
-  <div class="scroll" style="max-height:55vh"><table style="min-width:640px"><thead><tr><th>Category</th><th>Segment</th><th>Rental + VAT</th><th>Points</th><th>Effective From</th><th>Status</th><th>Actions</th></tr></thead><tbody id="ruleRows"></tbody></table></div>
+  <form id="teamArpuForm"><h2>Monthly team ARPU</h2><p class="sub">Used for upgrades made in the selected month. Saved sales keep their original calculation.</p><label>Month<input type="month" id="arpuMonth" required></label><div class="two"><label>Postpaid ARPU<input type="number" id="arpuPost" min="0.01" step="any" required></label><label>MBB ARPU<input type="number" id="arpuMbb" min="0.01" step="any" required></label><label>Fiber ARPU<input type="number" id="arpuFiber" min="0.01" step="any" required></label><label>HBB ARPU (5G TDD)<input type="number" id="arpuHbb" min="0.01" step="any" required></label></div><p class="err" id="arpuError" role="alert"></p><button class="btn pri">Save team ARPU</button></form><hr><div class="scroll" style="max-height:55vh"><table style="min-width:640px"><thead><tr><th>Category</th><th>Segment</th><th>Rental + VAT</th><th>Points</th><th>Effective From</th><th>Status</th><th>Actions</th></tr></thead><tbody id="ruleRows"></tbody></table></div>
   <div class="acts" style="margin-top:12px"><button type="button" class="btn" data-close>Close</button></div>
 </dialog>
 <dialog id="dRule"><form id="fRule" novalidate>
