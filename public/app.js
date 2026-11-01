@@ -345,7 +345,7 @@ $('#fRule').onsubmit=e=>{
   const seg=$('#rSeg').value,rent=parseFloat($('#rRent').value),pts=parseFloat($('#rPts').value),d=$('#rDate').value,err=x=>{$('#rerr').textContent=x};
   if(!seg||!(rent>0)||!(pts>=0)||!d)return err('Please enter a segment, a rental above 0, points (0 or more) and an effective date.');
   const r=ruleEdit&&S.rules.find(x=>x.id===ruleEdit);
-  if(S.rules.some(x=>x!==r&&!x.archived&&x.segment===seg&&+x.rental===rent&&x.effectiveFrom===d))return err('A rule for this segment, rental and effective date already exists.');
+  const lineage=new Set();let ancestor=r;while(ancestor&&!lineage.has(ancestor.id)){lineage.add(ancestor.id);ancestor=S.rules.find(x=>x.id===ancestor.prevId)};if(S.rules.some(x=>!lineage.has(x.id)&&!x.archived&&x.segment===seg&&+x.rental===rent&&x.effectiveFrom===d))return err('A rule for this segment, rental and effective date already exists.');
   let msg='Rule saved';
   if(r&&r.segment===seg&&+r.rental===rent&&+r.points===pts&&r.effectiveFrom===d){}
   else if(r&&ruleUsed(r)){ // used by saved sales: keep the old rule untouched and add a new version

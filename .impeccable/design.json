@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-01T09:03:03.7544968Z",
+  "title": "Design System: Zain Sales Performance",
+  "extensions": {
+    "source": {
+      "mode": "Operate",
+      "tokenAuthority": "DESIGN.md frontmatter",
+      "implementation": [
+        "public/brand.css",
+        "public/index.html",
+        "public/app.js"
+      ],
+      "verification": "Source inspection only. No browser screenshots or rendered visual verification.",
+      "cascade": "Later Zain declarations override the initial violet palette."
+    },
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Zain Plum",
+        "canonical": "#88377f",
+        "cssProperty": "--p"
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Deep Plum",
+        "canonical": "#6b2565",
+        "cssProperty": "--p2"
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Page Gray",
+        "canonical": "#f6f7f8",
+        "cssProperty": "--bg"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#22252b",
+        "cssProperty": "--ink"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Secondary Text",
+        "canonical": "#636773",
+        "cssProperty": "--mut"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Divider",
+        "canonical": "#e1e3e7",
+        "cssProperty": "--line"
+      },
+      "red": {
+        "role": "semantic",
+        "displayName": "Below Target / Error",
+        "canonical": "#bc2424",
+        "cssProperty": "--red"
+      },
+      "amber": {
+        "role": "semantic",
+        "displayName": "Approaching Target",
+        "canonical": "#946000",
+        "cssProperty": "--amb"
+      },
+      "green": {
+        "role": "semantic",
+        "displayName": "Target Achieved",
+        "canonical": "#26733e",
+        "cssProperty": "--grn"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Authentication Display",
+        "purpose": "Brand-side authentication heading; 32px at max-width 760px."
+      },
+      "headline": {
+        "displayName": "Page Heading",
+        "purpose": "Dashboard heading; 24px at max-width 760px."
+      },
+      "title": {
+        "displayName": "Panel Heading",
+        "purpose": "Panel titles; dialogs override to 18px, authentication forms to 28px."
+      },
+      "body": {
+        "displayName": "Operational Body",
+        "purpose": "Shared system font, with tabular-nums on body."
+      },
+      "label": {
+        "displayName": "Field Label",
+        "purpose": "Visible labels above full-width fields."
+      },
+      "metric": {
+        "displayName": "KPI Value",
+        "purpose": "Target, sales, achievement; 22px at max-width 760px."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card",
+        "value": "none",
+        "purpose": "Final override removes original card shadow."
+      },
+      {
+        "name": "dialog",
+        "value": "0 20px 50px rgba(30,27,46,.25)",
+        "purpose": "Modal elevation."
+      }
+    ],
+    "motion": [
+      {
+        "name": "button-state",
+        "value": "background .15s, border-color .15s",
+        "purpose": "Button state transitions; default CSS ease."
+      },
+      {
+        "name": "progress",
+        "value": "width .3s",
+        "purpose": "Progress-bar width; default CSS ease."
+      },
+      {
+        "name": "toast",
+        "value": "opacity .2s",
+        "purpose": "Toast visibility; default CSS ease."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "760px",
+        "query": "(max-width:760px)"
+      }
+    ],
+    "layout": {
+      "container": {
+        "maxWidth": "1180px",
+        "padding": "30px 16px 36px",
+        "mobilePaddingTop": "22px"
+      },
+      "pairedCards": {
+        "columns": "1fr 1fr",
+        "gap": "16px",
+        "mobileColumns": "1fr"
+      },
+      "tiles": {
+        "columns": "repeat(4,1fr)",
+        "gap": "12px",
+        "mobileColumns": "repeat(2,1fr)"
+      },
+      "pairedFields": {
+        "columns": "1fr 1fr",
+        "gap": "10px",
+        "mobileGap": "8px"
+      },
+      "history": {
+        "minWidth": "960px",
+        "maxHeight": "440px",
+        "overflow": "auto"
+      },
+      "team": {
+        "minWidth": "660px",
+        "maxHeight": "290px"
+      },
+      "dialog": {
+        "width": "min(440px,calc(100% - 24px))",
+        "padding": "22px",
+        "backdrop": "rgba(30,27,46,.45)"
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary save and creation actions, with the actual two-pixel specific focus rule.",
+      "html": "<button class=\"ds-primary\">Save Sale</button>",
+      "css": ".ds-primary{font:600 14px/1.45 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;min-height:38px;padding:8px 14px;border:1px solid var(--p,#88377f);border-radius:7px;background:var(--p,#88377f);color:#fff;cursor:pointer;transition:background .15s,border-color .15s}.ds-primary:hover{background:var(--p2,#6b2565);border-color:var(--p2,#6b2565)}.ds-primary:focus-visible{outline:2px solid var(--p2,#6b2565);outline-offset:2px}.ds-primary:disabled{opacity:.5;cursor:not-allowed}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Secondary actions such as setting targets or canceling a dialog.",
+      "html": "<button class=\"ds-secondary\">Set Target</button>",
+      "css": ".ds-secondary{font:600 14px/1.45 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;min-height:38px;padding:8px 14px;border:1px solid #d6d2e3;border-radius:7px;background:#fff;color:var(--ink,#22252b);cursor:pointer;transition:background .15s,border-color .15s}.ds-secondary:hover{border-color:var(--p2,#6b2565)}.ds-secondary:focus-visible{outline:2px solid var(--p2,#6b2565);outline-offset:2px}.ds-secondary:disabled{opacity:.5;cursor:not-allowed}"
+    },
+    {
+      "name": "Labeled Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Visible label and full-width field for operational forms.",
+      "html": "<label class=\"ds-label\">Order Number<input class=\"ds-field\" autocomplete=\"off\"></label>",
+      "css": ".ds-label{display:block;font:600 13px/1.45 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;color:var(--ink,#22252b);margin-bottom:12px}.ds-field{display:block;box-sizing:border-box;width:100%;min-height:38px;margin-top:5px;padding:9px 10px;border:1px solid #d6d2e3;border-radius:9px;background:#fff;font:400 13px/1.45 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;caret-color:var(--p,#88377f)}.ds-field:focus{outline:2px solid #bd87b7;border-color:var(--p2,#6b2565)}"
+    },
+    {
+      "name": "Segment Navigation",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Selected and unselected segments for month, chart, and history filters.",
+      "html": "<div class=\"ds-segments\" aria-label=\"Category\"><button class=\"ds-segment ds-on\" aria-pressed=\"true\">All</button><button class=\"ds-segment\" aria-pressed=\"false\">Postpaid</button><button class=\"ds-segment\" aria-pressed=\"false\">Broadband</button></div>",
+      "css": ".ds-segments{display:inline-flex;gap:2px;background:#fff;border:1px solid var(--line,#e1e3e7);border-radius:8px;padding:3px}.ds-segment{border:0;background:none;padding:6px 12px;border-radius:5px;cursor:pointer;color:var(--mut,#636773);font:600 14px/1.45 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;transition:background .15s,border-color .15s}.ds-segment.ds-on{background:var(--p,#88377f);color:#fff}.ds-segment:focus-visible{outline:2px solid var(--p2,#6b2565);outline-offset:2px}@media(max-width:760px){.ds-segment{padding:6px 8px}}"
+    },
+    {
+      "name": "Category Tags",
+      "kind": "chip",
+      "refersTo": "category-tag",
+      "description": "Read-only Postpaid and Broadband category badges.",
+      "html": "<span class=\"ds-tag\">Postpaid</span> <span class=\"ds-tag ds-broadband\">Broadband</span>",
+      "css": ".ds-tag{padding:2px 9px;border-radius:99px;font:600 12px/1.45 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;background:#f2e8f1;color:var(--p,#88377f)}.ds-tag.ds-broadband{background:#e0f5f3;color:#17605a}"
+    },
+    {
+      "name": "Operational Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat bordered container used for trend, summaries, breakdowns, and history.",
+      "html": "<section class=\"ds-card\"><h2 class=\"ds-title\">Sales History</h2><p class=\"ds-muted\">No sales recorded for this month yet.</p></section>",
+      "css": ".ds-card{background:#fff;color:var(--ink,#22252b);border:1px solid var(--line,#e1e3e7);border-radius:10px;padding:18px;box-shadow:none;font:14px/1.45 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;font-variant-numeric:tabular-nums}.ds-title{font-size:16px;font-weight:650;margin:0}.ds-muted{color:var(--mut,#636773);font-size:13px}"
+    },
+    {
+      "name": "KPI Progress",
+      "kind": "custom",
+      "description": "Achievement progress with text and 75%/100% milestones. Illustrative values are component examples only.",
+      "html": "<section class=\"ds-kpi\"><span class=\"ds-kpi-tag\">POSTPAID</span><div class=\"ds-values\"><div><small>Target</small><strong>100</strong></div><div><small>Sales</small><strong>80</strong></div><div><small>Achievement</small><strong class=\"ds-achievement\">80%</strong></div></div><div class=\"ds-bar\"><i></i><u></u></div><div class=\"ds-markers\"><span>75%</span><span>100%</span></div><p class=\"ds-remaining\">20 Points Remaining</p></section>",
+      "css": ".ds-kpi{padding:18px;background:#fff;border:1px solid var(--line,#e1e3e7);border-radius:10px;color:var(--ink,#22252b);font:14px/1.45 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;font-variant-numeric:tabular-nums}.ds-kpi-tag{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--p,#88377f)}.ds-values{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:15px 0 18px}.ds-values small{display:block;color:var(--mut,#636773);font-size:12px}.ds-values strong{font-size:28px;font-weight:650;line-height:1.2}.ds-achievement,.ds-remaining{color:var(--amb,#946000)}.ds-bar{position:relative;height:10px;border-radius:99px;background:#f0e9ef;overflow:hidden}.ds-bar i{display:block;height:100%;width:80%;border-radius:99px;background:var(--amb,#946000);transition:width .3s}.ds-bar u{position:absolute;top:0;bottom:0;left:75%;width:2px;background:#fff}.ds-markers{position:relative;height:16px;margin-top:3px;font-size:11px;color:var(--mut,#636773)}.ds-markers span:first-child{position:absolute;left:75%;transform:translateX(-50%)}.ds-markers span:last-child{position:absolute;right:0}.ds-remaining{font-weight:600;margin:6px 0 0}@media(max-width:760px){.ds-values strong{font-size:22px}}"
+    }
+  ],
+  "narrative": {
+    "northStar": null,
+    "overview": "The existing world is a restrained Zain operational interface: white work surfaces, quiet borders, plum actions, and readable tables. The official Zain logo and brand colors are durable commitments. Keep the useful dashboard structure and its paired Postpaid and Broadband views.",
+    "keyCharacteristics": [
+      "Compact, labeled controls and tabular numbers.",
+      "Flat bordered cards with emphasis reserved for actions and status.",
+      "Separate authentication and dashboard surfaces.",
+      "Horizontal scrolling for dense operational tables."
+    ],
+    "rules": [
+      {
+        "name": "The Final Cascade Rule",
+        "body": "Read the later Zain overrides as normative; do not restore the superseded violet palette when extending the interface.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Do preserve the official Zain logo and final brand tokens.",
+      "Do retain visible labels, keyboard focus, tabular numbers, and text alongside status colors.",
+      "Do keep tables scrollable and responsive cards readable on narrow screens.",
+      "Do show honest empty, saving, and unavailable states."
+    ],
+    "donts": [
+      "Don't replace the operational dashboard with a promotional layout.",
+      "Don't introduce email entry into the username and PIN workflow.",
+      "Don't expose credentials or configuration details inside agent workflows.",
+      "Don't treat source inspection as rendered visual verification."
+    ]
+  }
+}
+

@@ -13,4 +13,4 @@ Preserve the five segments, 22 source rentals, upgrade formula, unrounded points
 Zain colors and official Zain logo. Keep the source's useful dashboard structure. Use a restrained operational interface with clear tables and forms.
 
 ## Open setup
-Supabase project and organization selection, live credentials and the private main account PIN are pending. Do not infer them from other projects.
+The user created the dedicated salestracker Supabase project anjgkfhhwxxpelttklhd in aliunified95-cyber's Org. The database schema was applied through the Supabase SQL editor. Private Vercel credentials and the main account PIN remain user setup steps. Do not infer them from other projects.

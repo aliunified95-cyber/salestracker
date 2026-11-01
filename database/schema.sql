@@ -73,7 +73,7 @@ begin
   if coalesce(jsonb_typeof(r->'rental'),'')!='number' or not (r->>'rental')::numeric>0 or coalesce(jsonb_typeof(r->'points'),'')!='number' or not (r->>'points')::numeric>=0 or not coalesce(r->>'effectiveFrom','') ~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Invalid rule';end if;
   perform (r->>'effectiveFrom')::date;
   if tg_op='UPDATE' and (r-'archived') is distinct from (old.record-'archived') and exists(select 1 from public.tracker_sales where record->>'ruleId'=old.id) then raise exception 'Create a new version of a used rule';end if;
-  if exists(select 1 from public.tracker_rules t where t.id<>new.id and t.id is distinct from r->>'prevId' and not coalesce((t.record->>'archived')::boolean,false) and not coalesce((r->>'archived')::boolean,false) and t.record->>'segment'=r->>'segment' and (t.record->>'rental')::numeric=(r->>'rental')::numeric and t.record->>'effectiveFrom'=r->>'effectiveFrom') then raise exception 'Duplicate active rule';end if;
+  if exists(select 1 from public.tracker_rules t where t.id<>new.id and t.id not in (with recursive ancestors as (select id,record from public.tracker_rules where id=r->>'prevId' union select p.id,p.record from public.tracker_rules p join ancestors a on p.id=a.record->>'prevId') select id from ancestors) and not coalesce((t.record->>'archived')::boolean,false) and not coalesce((r->>'archived')::boolean,false) and t.record->>'segment'=r->>'segment' and (t.record->>'rental')::numeric=(r->>'rental')::numeric and t.record->>'effectiveFrom'=r->>'effectiveFrom') then raise exception 'Duplicate active rule';end if;
   new.record:=r||jsonb_build_object('id',new.id);return new;
  end if;
  if tg_op='UPDATE' and new.agent_id<>old.agent_id then raise exception 'Sale ownership cannot change';end if;

@@ -41,6 +41,7 @@ test('Database rules, snapshots and agent isolation',async t=>{
  await t.test('used rule may have a same-date successor without changing snapshots',async()=>{
   const prior=(await query('select id from tracker_rules where record->>\'segment\'=\'Postpaid Voice\' and (record->>\'rental\')::numeric=15')).rows[0].id;
   await query('insert into tracker_rules values($1,$2)',['successor',JSON.stringify({segment:'Postpaid Voice',rental:15,points:6,effectiveFrom:'2000-01-01',createdAt:1,prevId:prior,version:2})]);
+  await query('insert into tracker_rules values($1,$2)',['successor-3',JSON.stringify({segment:'Postpaid Voice',rental:15,points:8,effectiveFrom:'2000-01-01',createdAt:2,prevId:'successor',version:3})]);
   assert.equal((await query('select record from tracker_sales where id=\'mine\'')).rows[0].record.points,1.5);
  });
  await t.test('record IDs cannot contain HTML attributes',async()=>assert.rejects(sale('bad" onclick="x',1,{...base,orderNo:'invalid-id'}),/check constraint/));
