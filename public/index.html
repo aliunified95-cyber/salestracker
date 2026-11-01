@@ -17,6 +17,8 @@
     <div class="row"><button class="btn" id="bTarget">Set Agent Target</button><button class="btn" id="bTeamTarget" hidden>Set Team Target</button><button class="btn" id="bImportTargets" hidden>Import Agent Targets</button><button class="btn" id="bRules">Manage Sales Rules</button><button class="btn pri" id="bNew">+ New Sale</button></div>
   </header>
 
+  <section id="managerPanel" hidden class="team-panel"><div class="ch"><div><h2>Team overview</h2><p class="sub">Choose an agent to manage their targets or view their sales.</p></div><div class="row"><label class="agent-label">View<select id="agentView"></select></label><button class="btn" id="manageUsers">Manage users</button></div></div><div id="teamTable" class="scroll"></div></section>
+  <p id="teamTargetNote" class="sub"></p><p id="saveStatus" role="status" class="sub"></p>
   <div class="grid g3" id="kpis"></div>
 
   <section class="card" style="margin-bottom:16px">
