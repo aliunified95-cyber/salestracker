@@ -22,7 +22,7 @@ export default async function handler(req,res){
  const secure=process.env.VERCEL?' Secure;':'';
  const setCookies=(s,clear=false)=>res.setHeader('Set-Cookie',[
  `tracker_access=${clear?'':s.access_token}; HttpOnly;${secure} SameSite=Strict; Path=/; Max-Age=${clear?0:3600}`,
- `tracker_refresh=${clear?'':s.refresh_token}; HttpOnly;${secure} SameSite=Strict; Path=/; Max-Age=${clear?0:604800}`]);
+ `tracker_refresh=${clear?'':s.refresh_token}; HttpOnly;${secure} SameSite=Strict; Path=/; Max-Age=${clear?0:21600}`]);
  const rpc=(name,body,token,admin=false)=>sb(`/rest/v1/rpc/${name}`,{method:'POST',body,token,admin});
  const limit=async(identity)=>{const ip=String(req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0];const results=await Promise.all([rpc('tracker_attempt',{bucket:hash(`ip:${ip}`),max_attempts:120},null,true),rpc('tracker_attempt',{bucket:hash(`account:${identity}`),max_attempts:8},null,true)]);if(results.some(v=>!v)){const e=new Error('Too many attempts. Please wait 15 minutes.');e.status=429;throw e}};
  try{
@@ -99,3 +99,4 @@ export default async function handler(req,res){
   return res.status(404).json({error:'Page not found'});
  }catch(e){return res.status(e.status===429?429:400).json({error:e.message||'Unable to complete request'})}
 }
+
