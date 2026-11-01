@@ -12,6 +12,11 @@ const base={saleType:'new',orderNo:'O1',msisdn:'39000000',date:'2026-10-02',segm
 test('Database rules, snapshots and agent isolation',async t=>{
  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`);
  await db.exec(await readFile('database/schema.sql','utf8'));
+ await t.test('service limiter counts attempts and blocks the ninth',async()=>{
+  await db.exec('set role service_role');
+  for(let n=1;n<=9;n++)assert.equal((await query('select tracker_attempt($1) as allowed',['test-bucket'])).rows[0].allowed,n<=8);
+  await db.exec('reset role');
+ });
  for(let i=0;i<3;i++){await query('insert into auth.users values($1)',[ids[i]]);await query('insert into tracker_profiles(id,username,display_name,role,must_change_pin) values($1,$2,$2,$3,false)',[ids[i],i===0?'AM791':'AGENT'+i,i===0?'manager':'agent'])}
  await as(0);
  let count=0;
