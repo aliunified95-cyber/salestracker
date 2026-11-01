@@ -4,6 +4,23 @@ async function api(route,body){
  const d=await r.json();if(!r.ok)throw new Error(d.error||'Request failed');return d;
 }
 const clone=v=>JSON.parse(JSON.stringify(v));
+function targetImportChanges(text,month,profiles,targets){
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw new Error('Choose a valid month');
+ const changes=[],seen=new Set();
+ for(const line of text.trim().split(/\r?\n/).filter(l=>l.trim())){
+  if(line.includes('"'))throw new Error('Use plain numbers without quotes or thousands separators');
+  const parts=line.split(/[,\t]/).map(v=>v.trim());
+  if(/^(username|tabs id2)$/i.test(parts[0]))continue;
+  if(parts.length<3||parts.length>4||parts[1]===''||parts[2]==='')throw new Error('Each row needs Username, Postpaid and Broadband');
+  const username=parts[0].toUpperCase(),postpaid=Number(parts[1]),broadband=Number(parts[2]);
+  if(seen.has(username))throw new Error('Duplicate agent: '+username);seen.add(username);
+  const p=profiles.find(p=>p.username===username&&p.role==='agent');if(!p)throw new Error('Agent not found: '+username);
+  if(!Number.isFinite(postpaid)||!Number.isFinite(broadband)||postpaid<0||broadband<0)throw new Error('Targets must be nonnegative numbers: '+username);
+  const old=targets.find(t=>t.agent_id===p.id&&t.month===month)?.record||{};
+  changes.push({table:'targets',op:'upsert',agent_id:p.id,id:month,record:{...old,postpaid,broadband}});
+ }
+ if(!changes.length)throw new Error('Paste at least one agent target');return changes;
+}
 function teamTargetFor(month,profiles,targets,teamTargets){
  const agents=new Set(profiles.filter(p=>p.role==='agent').map(p=>p.id));
  const combined={postpaid:0,broadband:0};
@@ -24,6 +41,7 @@ function applyView(){
  document.querySelector('#managerPanel').hidden=!manager;
  document.querySelector('#teamTargetNote').hidden=!manager;
  document.querySelector('#bTarget').hidden=!manager||all;document.querySelector('#bTeamTarget').hidden=!manager||!all;document.querySelector('#bRules').hidden=!manager;document.querySelector('#bRestore').hidden=!manager;
+ document.querySelector('#bImportTargets').hidden=!manager||!all;
  document.querySelector('#bTarget').disabled=all;document.querySelector('#bNew').disabled=all;document.querySelector('#bRestore').disabled=all;
  document.querySelector('#bBackup').disabled=all;
  document.querySelector('#pageTitle').textContent=all?'Team performance · AM791':selectedAgent===profile.id?'My performance':(raw.profiles.find(p=>p.id===selectedAgent)?.display_name||'Agent')+' · Performance';
@@ -97,6 +115,8 @@ async function start(){
  document.querySelector('#pinForm').onsubmit=async e=>{e.preventDefault();const pin=document.querySelector('#newPin').value;if(pin!==document.querySelector('#confirmPin').value)return document.querySelector('#pinError').textContent='The PINs do not match';try{await api('pin',{currentPin:document.querySelector('#currentPin').value,pin});document.querySelector('#pinForm').reset();document.querySelector('#pinDialog').close();profile.must_change_pin=false;await signedIn(profile);toast('PIN updated')}catch(e){document.querySelector('#pinError').textContent=e.message}};
  document.querySelector('#manageUsers').onclick=()=>{userList();document.querySelector('#usersDialog').showModal()};
  document.querySelector('#bTeamTarget').onclick=()=>{document.querySelector('#teamMonth').value=view;fillTeamTarget();document.querySelector('#teamTargetError').textContent='';document.querySelector('#teamTargetDialog').showModal()};
+ document.querySelector('#bImportTargets').onclick=()=>{document.querySelector('#targetImportMonth').value=view;document.querySelector('#targetImportError').textContent='';document.querySelector('#targetImportDialog').showModal()};
+ document.querySelector('#targetImportForm').onsubmit=async e=>{e.preventDefault();let changes;const month=document.querySelector('#targetImportMonth').value;try{changes=targetImportChanges(document.querySelector('#targetImportText').value,month,raw.profiles,raw.targets)}catch(e){document.querySelector('#targetImportError').textContent=e.message;return}const unlock=lockMutations();if(!unlock)return;try{await api('save',{changes});view=month;await reload();document.querySelector('#targetImportText').value='';document.querySelector('#targetImportDialog').close();toast(`${changes.length} agent targets saved`)}catch(e){document.querySelector('#targetImportError').textContent=e.message}finally{unlock()}};
  document.querySelector('#teamMonth').onchange=fillTeamTarget;document.querySelector('#teamMode').onchange=setTeamMode;
  document.querySelector('#teamTargetForm').onsubmit=async e=>{e.preventDefault();const unlock=lockMutations();if(!unlock)return;const button=document.querySelector('#saveTeamTarget');button.disabled=true;try{const month=document.querySelector('#teamMonth').value;await api('team-target',{month,mode:document.querySelector('#teamMode').value,postpaid:Number(document.querySelector('#teamPost').value),broadband:Number(document.querySelector('#teamBb').value)});view=month;await reload();document.querySelector('#teamTargetDialog').close();toast('Team target saved for AM791')}catch(e){document.querySelector('#teamTargetError').textContent=e.message}finally{button.disabled=false;unlock()}};
  document.querySelector('#provisionTeam').onclick=async()=>{if(teamProvisioning)return;const unlock=lockMutations();if(!unlock)return;teamProvisioning=true;const button=document.querySelector('#provisionTeam');button.disabled=true;document.querySelector('#provisionStatus').textContent='Creating the requested team accounts…';try{const result=await api('provision-team',{});if(result.created.length){const csv='Username,Temporary PIN,First login\r\n'+result.created.map(u=>`${u.username},${u.pin},Change PIN required`).join('\r\n');dl('agent-temporary-pins.csv','text/csv',csv)}await reload();userList();document.querySelector('#provisionStatus').textContent=`Created ${result.created.length} accounts. ${result.skipped.length} already existed. ${result.errors.length} could not be created.`;if(result.created.length)document.querySelector('#provisionStatus').textContent+=' Temporary PINs were downloaded. Keep the file private.';}catch(e){document.querySelector('#provisionStatus').textContent=e.message}finally{teamProvisioning=false;button.disabled=false;unlock()}};
@@ -203,7 +223,7 @@ function render(){
   const ms=monthSales(),t=S.targets[view]||{},P=c=>total(ms.filter(x=>catOf(x.segment)===c)),U=(c,u)=>total(ms.filter(x=>catOf(x.segment)===c&&(x.saleType==='upgrade')===!!u));
   $('#sub').textContent=`${mName(view)}: ${ms.length} sale${ms.length===1?'':'s'}`;
   $('#months').innerHTML=`<button data-m="${shift(view,-1)}" aria-label="Previous month">‹</button>`+[-1,0,1].map(n=>`<button data-m="${shift(view,n)}" class="${n?'':'on'}">${mName(shift(view,n))}</button>`).join('')+`<button data-m="${shift(view,1)}" aria-label="Next month">›</button>`;
-  $('#kpis').innerHTML=kpi('POSTPAID',t.postpaid,P('Postpaid'))+kpi('BROADBAND',t.broadband,P('Broadband'));
+  $('#kpis').innerHTML=kpi('POSTPAID',t.postpaid,P('Postpaid'))+kpi('BROADBAND',t.broadband,P('Broadband'))+kpi('TOTAL',Number(t.postpaid||0)+Number(t.broadband||0),P('Postpaid')+P('Broadband'));
   document.querySelectorAll('#trend button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.settings.trend));
   $('#chart').innerHTML=chart(ms);
   const brk=c=>`<section class="card"><span class="tag">${c.toUpperCase()} BREAKDOWN</span><ul class="bl">${SEGS[c].map(s=>`<li><span>${s}</span><b>${f(total(ms.filter(x=>x.segment===s)))} Points</b></li>`).join('')}<li class="sm"><span>New Sales</span><span>${U(c,0).toFixed(2)} Points</span></li><li class="sm"><span>Upgrades</span><span>${U(c,1).toFixed(2)} Points</span></li><li class="tot"><span>Total ${c}</span><b>${P(c).toFixed(2)} Points</b></li></ul></section>`;
