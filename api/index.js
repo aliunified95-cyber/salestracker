@@ -83,13 +83,14 @@ export default async function handler(req,res){
    const name=username(b.username);if(!validName(name))return res.status(400).json({error:'Use 3 to 30 letters, numbers or underscores'});
    if(b.action==='create'){
     if(!validPin(b.pin))return res.status(400).json({error:'Use an 8 to 12 digit temporary PIN'});
-    const role=b.role==='manager'?'manager':'agent';if(role==='manager'&&profile.username!=='AM791')return res.status(403).json({error:'Only AM791 can create managers'});
+    const role=['manager','admin'].includes(b.role)?b.role:'agent';if(role==='manager'&&profile.username!=='AM791')return res.status(403).json({error:'Only AM791 can create managers'});
     const u=await sb('/auth/v1/admin/users',{method:'POST',admin:true,body:{email:alias(name),password:b.pin,email_confirm:true}});
     try{await sb('/rest/v1/tracker_profiles',{method:'POST',admin:true,body:{id:u.id,username:name,display_name:String(b.display_name||name).slice(0,100),role,must_change_pin:true}})}catch(e){await sb(`/auth/v1/admin/users/${u.id}`,{method:'DELETE',admin:true});throw e}
    }else{
     const p=(await sb(`/rest/v1/tracker_profiles?username=eq.${name}&select=*`,{admin:true}))[0];if(!p)throw new Error('Account not found');if(p.username==='AM791'||(p.role==='manager'&&profile.username!=='AM791'))return res.status(403).json({error:'Only AM791 can manage other managers. The main account cannot be disabled.'});
     if(b.action==='reset'){if(!validPin(b.pin))throw new Error('Use an 8 to 12 digit PIN');await sb(`/auth/v1/admin/users/${p.id}`,{method:'PUT',admin:true,body:{password:b.pin}});await sb(`/rest/v1/tracker_profiles?id=eq.${p.id}`,{method:'PATCH',admin:true,body:{must_change_pin:true}})}
     else if(b.action==='toggle')await sb(`/rest/v1/tracker_profiles?id=eq.${p.id}`,{method:'PATCH',admin:true,body:{active:!p.active}});
+    else if(b.action==='setrole'){if(!['agent','admin'].includes(b.role)||!['agent','admin'].includes(p.role))throw new Error('Only agent and admin roles can be changed here');await sb(`/rest/v1/tracker_profiles?id=eq.${p.id}`,{method:'PATCH',admin:true,body:{role:b.role}})}
     else throw new Error('Unknown account action');
    }
    return res.status(200).json({ok:true});

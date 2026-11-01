@@ -14,7 +14,7 @@ function targetImportChanges(text,month,profiles,targets){
   if(parts.length<3||parts.length>4||parts[1]===''||parts[2]==='')throw new Error('Each row needs Username, Postpaid and Broadband');
   const username=parts[0].toUpperCase(),postpaid=Number(parts[1]),broadband=Number(parts[2]);
   if(seen.has(username))throw new Error('Duplicate agent: '+username);seen.add(username);
-  const p=profiles.find(p=>p.username===username&&p.role==='agent');if(!p)throw new Error('Agent not found: '+username);
+  const p=profiles.find(p=>p.username===username&&['agent','admin'].includes(p.role));if(!p)throw new Error('Agent not found: '+username);
   if(!Number.isFinite(postpaid)||!Number.isFinite(broadband)||postpaid<0||broadband<0)throw new Error('Targets must be nonnegative numbers: '+username);
   const old=targets.find(t=>t.agent_id===p.id&&t.month===month)?.record||{};
   changes.push({table:'targets',op:'upsert',agent_id:p.id,id:month,record:{...old,postpaid,broadband}});
@@ -22,7 +22,7 @@ function targetImportChanges(text,month,profiles,targets){
  if(!changes.length)throw new Error('Paste at least one agent target');return changes;
 }
 function teamTargetFor(month,profiles,targets,teamTargets){
- const agents=new Set(profiles.filter(p=>p.role==='agent').map(p=>p.id));
+ const agents=new Set(profiles.filter(p=>['agent','admin'].includes(p.role)).map(p=>p.id));
  const combined={postpaid:0,broadband:0};
  for(const t of targets)if(agents.has(t.agent_id)&&t.month===month)for(const c of ['postpaid','broadband'])combined[c]+=Number(t.record[c]||0);
  const saved=teamTargets?.find(t=>t.month===month)?.record;const mode=saved?.mode==='manual'?'manual':'sum';
@@ -31,7 +31,7 @@ function teamTargetFor(month,profiles,targets,teamTargets){
 }
 function stateFor(agent){
  const all=agent==='all';const targets={};
- const agents=new Set(raw.profiles.filter(p=>p.role==='agent').map(p=>p.id));
+ const agents=new Set(raw.profiles.filter(p=>['agent','admin'].includes(p.role)).map(p=>p.id));
  if(all){for(const month of new Set([...raw.targets.map(t=>t.month),...(raw.teamTargets||[]).map(t=>t.month)]))targets[month]=teamTargetFor(month,raw.profiles,raw.targets,raw.teamTargets).target}
  else for(const t of raw.targets.filter(t=>t.agent_id===agent))targets[t.month]=clone(t.record);
  return migrate({version:1,settings:{trend:S?.settings.trend||'both'},targets,sales:raw.sales.filter(s=>all?agents.has(s.agent_id):s.agent_id===agent).map(s=>clone(s.record)),rules:raw.rules.map(r=>clone(r.record))});
@@ -40,7 +40,7 @@ function applyView(){
  S=stateFor(selectedAgent);snapshot=clone(S);const manager=profile.role==='manager',all=selectedAgent==='all';
  document.querySelector('#managerPanel').hidden=!manager;
  document.querySelector('#teamTargetNote').hidden=!manager;
- document.querySelector('#bTarget').hidden=!manager||all;document.querySelector('#bTeamTarget').hidden=!manager||!all;document.querySelector('#bRules').hidden=!manager;document.querySelector('#bRestore').hidden=!manager;
+ document.querySelector('#bTarget').hidden=!manager||all;document.querySelector('#bTeamTarget').hidden=!manager||!all;document.querySelector('#bRules').hidden=!manager&&profile.role!=='admin';document.querySelector('#bRestore').hidden=!manager;
  document.querySelector('#bImportTargets').hidden=!manager||!all;
  document.querySelector('#bTarget').disabled=all;document.querySelector('#bNew').disabled=all;document.querySelector('#bRestore').disabled=all;
  document.querySelector('#bBackup').disabled=all;
@@ -68,7 +68,7 @@ async function queueSave(){
  finally{saving=false;document.body.classList.remove('saving');document.querySelector('#app').inert=false;const queued=pendingToast;pendingToast=null;if(success&&queued)toast(queued.m,queued.k)}
 }
 function renderTeam(){
- const agents=raw.profiles.filter(p=>p.role==='agent');
+ const agents=raw.profiles.filter(p=>['agent','admin'].includes(p.role));
  const select=document.querySelector('#agentView');select.innerHTML='<option value="all">All team · AM791</option>'+agents.map(p=>`<option value="${p.id}">${esc(p.display_name)} (${esc(p.username)})${p.active?'':' · disabled'}</option>`).join('');select.value=selectedAgent;
  const totals=teamTargetFor(view,raw.profiles,raw.targets,raw.teamTargets);
  document.querySelector('#teamTargetNote').textContent=`Team owner: AM791. ${totals.mode==='manual'?'Custom team target':'Combined agent targets'}: Postpaid ${f(totals.target.postpaid)}, Broadband ${f(totals.target.broadband)}. Agents combined: ${f(totals.combined.postpaid)} / ${f(totals.combined.broadband)}.`;
@@ -76,10 +76,10 @@ function renderTeam(){
   const achievement=(points,target)=>target>0?(points/target*100).toFixed(2)+'%':'No target';
   return `<tr><td><button class="btn sm" data-agent="${p.id}">${esc(p.display_name)}</button><small class="sub"> ${esc(p.username)}</small></td><td>${sales.length}</td><td>${f(post)} / ${t.postpaid??'—'}</td><td>${achievement(post,t.postpaid)}</td><td>${f(bb)} / ${t.broadband??'—'}</td><td>${achievement(bb,t.broadband)}</td></tr>`;
  });
- document.querySelector('#teamTable').innerHTML='<table style="min-width:660px"><thead><tr><th>Agent</th><th>Sales</th><th>Postpaid points / target</th><th>Achievement</th><th>Broadband points / target</th><th>Achievement</th></tr></thead><tbody>'+(table.join('')||'<tr><td colspan="6" class="empty">Create your agents to start setting monthly targets.</td></tr>')+'</tbody></table>';
+ document.querySelector('#teamTable').innerHTML='<table style="width:100%"><thead><tr><th>Agent</th><th>Sales</th><th>Postpaid points / target</th><th>Achievement</th><th>Broadband points / target</th><th>Achievement</th></tr></thead><tbody>'+(table.join('')||'<tr><td colspan="6" class="empty">Create your agents to start setting monthly targets.</td></tr>')+'</tbody></table>';
 }
 function userList(){
- document.querySelector('#usersList').innerHTML='<table style="min-width:550px"><thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+raw.profiles.map(p=>`<tr><td>${esc(p.username)}</td><td>${esc(p.display_name)}</td><td>${p.role}</td><td>${p.active?'Active':'Disabled'}${p.must_change_pin?' · PIN change required':''}</td><td>${p.username==='AM791'?'Main account':`<button class="btn sm" data-reset="${esc(p.username)}">Reset PIN</button> <button class="btn sm" data-toggle="${esc(p.username)}">${p.active?'Disable':'Enable'}</button>`}</td></tr>`).join('')+'</tbody></table>';
+ document.querySelector('#usersList').innerHTML='<table style="min-width:550px"><thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+raw.profiles.map(p=>`<tr><td>${esc(p.username)}</td><td>${esc(p.display_name)}</td><td>${p.role}</td><td>${p.active?'Active':'Disabled'}${p.must_change_pin?' · PIN change required':''}</td><td>${p.username==='AM791'?'Main account':`<button class="btn sm" data-reset="${esc(p.username)}">Reset PIN</button> <button class="btn sm" data-toggle="${esc(p.username)}">${p.active?'Disable':'Enable'}</button>${p.role==='agent'||p.role==='admin'?` <button class="btn sm" data-role="${esc(p.username)}" data-next="${p.role==='agent'?'admin':'agent'}">${p.role==='agent'?'Make admin':'Make agent'}</button>`:''}`}</td></tr>`).join('')+'</tbody></table>';
  document.querySelector('#newRole').disabled=profile.username!=='AM791';
  const wanted=['BF01387','BF01049','BF01525','BF01437','BF01545','BF01539','BF01484','BF01565','BF01278','BF01171','BF01441'];
  document.querySelector('#provisionTeam').hidden=profile.username!=='AM791'||wanted.every(u=>raw.profiles.some(p=>p.username===u));
@@ -121,7 +121,7 @@ async function start(){
  document.querySelector('#teamTargetForm').onsubmit=async e=>{e.preventDefault();const unlock=lockMutations();if(!unlock)return;const button=document.querySelector('#saveTeamTarget');button.disabled=true;try{const month=document.querySelector('#teamMonth').value;await api('team-target',{month,mode:document.querySelector('#teamMode').value,postpaid:Number(document.querySelector('#teamPost').value),broadband:Number(document.querySelector('#teamBb').value)});view=month;await reload();document.querySelector('#teamTargetDialog').close();toast('Team target saved for AM791')}catch(e){document.querySelector('#teamTargetError').textContent=e.message}finally{button.disabled=false;unlock()}};
  document.querySelector('#provisionTeam').onclick=async()=>{if(teamProvisioning)return;const unlock=lockMutations();if(!unlock)return;teamProvisioning=true;const button=document.querySelector('#provisionTeam');button.disabled=true;document.querySelector('#provisionStatus').textContent='Creating the requested team accounts…';try{const result=await api('provision-team',{});if(result.created.length){const csv='Username,Temporary PIN,First login\r\n'+result.created.map(u=>`${u.username},${u.pin},Change PIN required`).join('\r\n');dl('agent-temporary-pins.csv','text/csv',csv)}await reload();userList();document.querySelector('#provisionStatus').textContent=`Created ${result.created.length} accounts. ${result.skipped.length} already existed. ${result.errors.length} could not be created.`;if(result.created.length)document.querySelector('#provisionStatus').textContent+=' Temporary PINs were downloaded. Keep the file private.';}catch(e){document.querySelector('#provisionStatus').textContent=e.message}finally{teamProvisioning=false;button.disabled=false;unlock()}};
  document.querySelector('#userForm').onsubmit=async e=>{e.preventDefault();try{await api('users',{action:'create',username:document.querySelector('#newUser').value,display_name:document.querySelector('#newName').value,pin:document.querySelector('#userPin').value,role:document.querySelector('#newRole').value});document.querySelector('#userForm').reset();await reload();userList();toast('Account created. Share the temporary PIN with this agent.')}catch(e){document.querySelector('#userError').textContent=e.message}};
- document.querySelector('#usersList').onclick=async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.reset){resetUser=b.dataset.reset;document.querySelector('#resetName').textContent=resetUser;document.querySelector('#resetDialog').showModal()}if(b.dataset.toggle){try{await api('users',{action:'toggle',username:b.dataset.toggle});await reload();userList()}catch(e){toast(e.message,'err')}}};
+ document.querySelector('#usersList').onclick=async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.reset){resetUser=b.dataset.reset;document.querySelector('#resetName').textContent=resetUser;document.querySelector('#resetDialog').showModal()}if(b.dataset.toggle){try{await api('users',{action:'toggle',username:b.dataset.toggle});await reload();userList()}catch(e){toast(e.message,'err')}}if(b.dataset.role){try{await api('users',{action:'setrole',username:b.dataset.role,role:b.dataset.next});await reload();userList();toast('Role updated')}catch(e){toast(e.message,'err')}}};
  document.querySelector('#resetForm').onsubmit=async e=>{e.preventDefault();try{await api('users',{action:'reset',username:resetUser,pin:document.querySelector('#resetPin').value});document.querySelector('#resetForm').reset();document.querySelector('#resetDialog').close();await reload();userList();toast('Temporary PIN reset')}catch(e){document.querySelector('#resetError').textContent=e.message}};
  try{const h=await api('health');document.querySelector('#connection').textContent=h.configured?'':'Setup pending: the secure database connection has not been configured.';if(!h.configured)return;const {profile:p}=await api('session');await signedIn(p)}catch(e){if(e.message!=='Please sign in')document.querySelector('#connection').textContent=e.message}
 }
@@ -372,7 +372,7 @@ function rentalsFor(seg,date,keep){
   if(keep!==''&&keep!=null&&!out.includes(+keep))out.push(+keep);return out.sort((a,b)=>a-b);
 }
 function keepOld(seg,r,d){const o=editId&&S.sales.find(x=>x.id===editId);return o&&o.saleType==='new'&&o.segment===seg&&String(o.rental)===String(r)&&o.date===d?o:null}
-const ruleUsed=r=>raw.sales.filter(s=>s.record.ruleId===r.id).length;
+const ruleUsed=r=>true;
 function renderRules(){
   const t=today(),ci=s=>[...SEGS.Postpaid,...SEGS.Broadband].indexOf(s);
   const L=S.rules.slice().sort((a,b)=>ci(a.segment)-ci(b.segment)||a.rental-b.rental||a.effectiveFrom.localeCompare(b.effectiveFrom));
@@ -410,7 +410,7 @@ $('#ruleRows').onclick=e=>{
   if(b.dataset.re)openRule(b.dataset.re);
   if(b.dataset.rr){S.rules.find(x=>x.id===b.dataset.rr).archived=false;save();renderRules();toast('Rule restored')}
   if(b.dataset.rd){const r=S.rules.find(x=>x.id===b.dataset.rd),n=ruleUsed(r);
-    ask(n?`This rule is used by ${n} saved sale${n>1?'s':''}, so it will be archived instead of deleted. Saved sales keep their points.`:'Delete this rule?',n?'Archive':'Delete',()=>{
+    ask(n?'This rule will be archived. Saved sales keep their points.':'Delete this rule?',n?'Archive':'Delete',()=>{
       if(n)r.archived=true;else S.rules=S.rules.filter(x=>x!==r);
       save();renderRules();toast(n?'Rule archived':'Rule deleted')})}
 };

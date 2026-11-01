@@ -12,13 +12,15 @@ The original charts, daily performance, month navigation, breakdowns, history se
 
 Use a dedicated new Supabase project. Do not apply this schema to unrelated databases.
 
-1. Apply database/schema.sql, database/seed.sql and database/team-targets.sql to the new project. Existing installations only need database/team-targets.sql for the team target feature.
+1. Apply database/schema.sql, database/seed.sql, database/team-targets.sql and database/admin-role.sql to the new project.
 2. In Vercel, set SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY and a long random TRACKER_SETUP_CODE as server environment variables. Service credentials must never be committed or placed in public files.
 3. Deploy the main branch. Open /?setup=1, enter the private setup code and choose the AM791 PIN. This flow can only create AM791 once. Remove TRACKER_SETUP_CODE after setup and redeploy.
 4. Sign in as AM791. Open Manage users to create agent accounts and temporary PINs. Agents must change the temporary PIN on first login.
 5. Configure monthly targets and ARPU before entering upgrades. Import existing agent JSON backups through Restore Data after selecting the correct agent. The HTML source itself contains no historical sales or populated monthly targets; those are stored in each agent's old browser storage and require a backup export.
 
 Only AM791 can create or manage other managers. Existing access tokens lose data access immediately when a profile is disabled or marked for a mandatory PIN change. Rate limits persist in the database. PINs never appear in the account list or exports. Disabled accounts and historical sales are retained.
+
+Admins are agents who can also manage shared sales rules. They see only their own sales and targets, count toward the team's performance and allocations, and cannot manage accounts or team targets. Managers can assign or remove the admin role in Manage users. Used rules retain their historical version and saved sales keep their original points.
 
 AM791 owns the monthly team target. Managers can use the combined targets of agent accounts or choose a lower team target separately for Postpaid and Broadband. Individual allocations stay unchanged. If allocations are reduced below a saved custom target, its effective value is capped at the current combined allocation. Manager personal targets and sales are excluded from team totals.
 

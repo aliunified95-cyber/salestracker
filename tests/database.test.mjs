@@ -13,6 +13,7 @@ test('Database rules, snapshots and agent isolation',async t=>{
  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`);
  await db.exec(await readFile('database/schema.sql','utf8'));
  await db.exec(await readFile('database/team-targets.sql','utf8'));
+ await db.exec(await readFile('database/admin-role.sql','utf8'));
  await t.test('service limiter counts attempts and blocks the ninth',async()=>{
   await db.exec('set role service_role');
   for(let n=1;n<=9;n++)assert.equal((await query('select tracker_attempt($1) as allowed',['test-bucket'])).rows[0].allowed,n<=8);
@@ -55,6 +56,17 @@ test('Database rules, snapshots and agent isolation',async t=>{
   await assert.rejects(sale('null-upgrade',1,{...base,orderNo:'null-upgrade',saleType:'upgrade'}),/exceed/);
  });
  await t.test('duplicate order is case insensitive per agent',async()=>assert.rejects(sale('dup',1,{...base,orderNo:'o1'}),/duplicate key/));
+ await t.test('admin manages rules but cannot see other agents or change targets',async()=>{
+  await db.exec('reset role');await query("update tracker_profiles set role='admin' where id=$1",[ids[2]]);await as(2);
+  assert.equal((await query('select * from tracker_sales')).rows.length,0);
+  assert.equal((await query('select * from tracker_profiles')).rows.length,1);
+  assert.equal((await query('select * from tracker_team_targets')).rows.length,0);
+  await assert.rejects(query('insert into tracker_targets values($1,$2,$3)',[ids[2],'2026-11','{"postpaid":1,"broadband":1}']),/row-level security/);
+  await query('insert into tracker_rules values($1,$2)',['admin-rule',JSON.stringify({segment:'Family',rental:55,points:1,effectiveFrom:'2026-01-01',createdAt:0})]);
+  const used=await db.query("select record->>'ruleId' as id from tracker_sales where id='mine'");
+  assert.equal(used.rows.length,0);
+  await assert.rejects(query("update tracker_rules set record=record||'{\"points\":99}' where id='seed-2'"),/new version/);
+ });
  await as(0);
  await t.test('used rule may have a same-date successor without changing snapshots',async()=>{
   const prior=(await query('select id from tracker_rules where record->>\'segment\'=\'Postpaid Voice\' and (record->>\'rental\')::numeric=15')).rows[0].id;

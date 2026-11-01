@@ -21,7 +21,7 @@ begin
  if new.record->>'mode'='manual' then
   foreach field in array array['postpaid','broadband'] loop
    if coalesce(jsonb_typeof(new.record->field),'')!='number' or (new.record->>field)::numeric<0 then raise exception 'Enter nonnegative team targets';end if;
-   select coalesce(sum((t.record->>field)::numeric),0) into combined from public.tracker_targets t join public.tracker_profiles p on p.id=t.agent_id where t.month=new.month and p.role='agent';
+   select coalesce(sum((t.record->>field)::numeric),0) into combined from public.tracker_targets t join public.tracker_profiles p on p.id=t.agent_id where t.month=new.month and p.role in ('agent','admin');
    if (new.record->>field)::numeric>combined then raise exception 'Custom team targets cannot exceed combined agent targets';end if;
   end loop;
  end if;
