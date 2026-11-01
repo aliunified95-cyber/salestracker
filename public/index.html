@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Zain | Sales Performance</title>
+<link rel="stylesheet" href="/brand.css">
+</head>
+<body>
+<section id="auth" class="auth"><div class="auth-brand"><img src="/zain-logo.svg" alt="Zain" width="160"><h1>Every sale.<br>Every target.<br>One team.</h1><p>Sales performance, with a clear view of your progress.</p></div><div class="auth-form"><form id="loginForm"><h2>Welcome back</h2><p>Sign in with your username and PIN.</p><label>Username<input id="loginUser" autocomplete="username" required value="AM791" maxlength="30"></label><label>PIN<input id="loginPin" type="password" inputmode="numeric" autocomplete="current-password" pattern="[0-9]{8,12}" minlength="8" maxlength="12" required></label><p id="loginError" class="err" role="alert"></p><button class="btn pri" id="loginButton">Sign in</button><p class="sub">Use your 8 to 12 digit PIN. Ask your manager if you need an account.</p></form><form id="setupForm" hidden><h2>Set up AM791</h2><p>Create the main manager account.</p><label>Setup code<input id="setupCode" type="password" required autocomplete="off"></label><label>Your PIN<input id="setupPin" type="password" inputmode="numeric" pattern="[0-9]{8,12}" minlength="8" maxlength="12" required autocomplete="new-password"></label><label>Confirm PIN<input id="setupConfirm" type="password" inputmode="numeric" required autocomplete="new-password"></label><p class="err" id="setupError" role="alert"></p><button class="btn pri">Create main account</button></form><p id="connection" role="status">Checking connection…</p></div></section>
+<div id="app" hidden><div class="topbar"><img src="/zain-logo.svg" alt="Zain" width="100"><span>Sales Performance</span><div class="account"><span id="accountName"></span><button class="btn sm" id="refresh">Refresh</button><button class="btn sm" id="changePin">Change PIN</button><button class="btn sm" id="logout">Sign out</button></div></div>
+<div class="wrap">
+  <header>
+    <div><h1 id="pageTitle">My performance</h1><div class="sub" id="sub"></div></div>
+    <div class="seg" id="months"></div>
+    <div class="row"><button class="btn" id="bTarget">Set Target</button><button class="btn" id="bRules">Manage Sales Rules</button><button class="btn pri" id="bNew">+ New Sale</button></div>
+  </header>
+
+  <section id="managerPanel" hidden class="team-panel"><div class="ch"><div><h2>Team overview</h2><p class="sub">Choose an agent to manage their targets or view their sales.</p></div><div class="row"><label class="agent-label">View<select id="agentView"></select></label><button class="btn" id="manageUsers">Manage users</button></div></div><div id="teamTable" class="scroll"></div></section>
+  <p id="saveStatus" role="status" class="sub"></p>
+  <div class="grid g2" id="kpis"></div>
+
+  <section class="card" style="margin-bottom:16px">
+    <div class="ch">
+      <h2>Daily Sales Trend</h2>
+      <div class="seg" id="trend"><button data-t="Postpaid">Postpaid</button><button data-t="Broadband">Broadband</button><button data-t="both">Both</button></div>
+    </div>
+    <div id="chart"></div>
+  </section>
+
+  <div class="grid g2" id="brk"></div>
+
+  <section class="card" id="today" style="margin-bottom:16px"></section>
+
+  <section class="card">
+    <div class="ch">
+      <h2>Sales History</h2>
+      <div class="tb">
+        <input class="search" id="q" type="search" placeholder="Search order or mobile number" aria-label="Search sales">
+        <div class="seg" id="cats"><button data-c="All">All</button><button data-c="Postpaid">Postpaid</button><button data-c="Broadband">Broadband</button></div>
+        <div class="seg" id="types"><button data-y="all">All Types</button><button data-y="new">New Sales</button><button data-y="upgrade">Upgrades</button></div>
+      </div>
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>Date</th><th>Order Number</th><th>Mobile Number</th><th>Category</th><th>Segment</th><th>Sale Type</th><th>Rental</th><th>ARPU</th><th>Points</th><th>Actions</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+  </section>
+
+  <footer>
+    <span>Data</span>
+    <button class="btn sm" id="bCsv">Export CSV</button>
+    <button class="btn sm" id="bBackup">Backup Data</button>
+    <button class="btn sm" id="bRestore">Restore Data</button>
+    <input type="file" id="file" accept=".json,application/json" hidden>
+  </footer>
+</div>
+
+<dialog id="dSale"><form id="fSale" novalidate>
+  <h2 id="saleTitle">New Sale</h2>
+  <div class="seg" id="stype" style="margin-bottom:12px"><button type="button" data-s="new">New Sale</button><button type="button" data-s="upgrade">Upgrade</button></div>
+  <label>Order Number<input id="fOrder" autocomplete="off"></label>
+  <label>Mobile / Subscriber Number<input id="fMsisdn" inputmode="tel" autocomplete="off"></label>
+  <div class="two">
+    <label>Sale Date<input type="date" id="fDate"></label>
+    <label>Segment<select id="fSeg"></select></label>
+  </div>
+  <label id="lNew">Rental + VAT<select id="fRent" disabled></select></label>
+  <div class="two hide" id="upBox"><label>Previous Rental (no VAT)<input type="number" id="fPrev" min="0" step="any"></label><label>New Rental (no VAT)<input type="number" id="fNext" min="0" step="any"></label></div>
+  <div class="pv" id="pv"></div>
+  <p class="err" id="err"></p>
+  <div class="acts"><button type="button" class="btn" data-close>Cancel</button><button class="btn pri">Save Sale</button></div>
+</form></dialog>
+
+<dialog id="dTarget"><form id="fTarget" novalidate>
+  <h2>Set Monthly Target</h2>
+  <label>Month<input type="month" id="tMonth" placeholder="YYYY-MM"></label>
+  <div class="two">
+    <div class="grp" style="grid-column:1/-1">Targets</div>
+    <label>Postpaid Target<input type="number" id="tPost" min="0" step="any"></label>
+    
+    
+    <label>Broadband Target<input type="number" id="tBb" min="0" step="any"></label>
+    <div class="grp" style="grid-column:1/-1">ARPU Settings</div>
+    <label>Postpaid ARPU<input type="number" id="tPostArpu" min="0" step="any" placeholder="e.g. 8"></label>
+    
+    <label>MBB ARPU<input type="number" id="tMbbArpu" min="0" step="any" placeholder="e.g. 10"></label>
+    <label>Fiber ARPU<input type="number" id="tFiberArpu" min="0" step="any" placeholder="e.g. 15"></label>
+    <label>HBB ARPU (5G TDD)<input type="number" id="tHbbArpu" min="0" step="any" placeholder="e.g. 15"></label>
+  </div>
+  <p class="err" id="terr"></p>
+  <div class="acts"><button type="button" class="btn" data-close>Cancel</button><button class="btn pri">Save Target</button></div>
+</form></dialog>
+
+<dialog id="dRules" style="width:min(860px,calc(100% - 24px))">
+  <div class="ch"><h2 style="margin:0">Sales Rules</h2><button class="btn pri" id="bAddRule">+ Add Rule</button></div>
+  <p class="sub" style="margin:0 0 10px">New Sale points come from these rules. A sale uses the latest rule effective on its sale date, and saved sales keep the points they were saved with.</p>
+  <div class="scroll" style="max-height:55vh"><table style="min-width:640px"><thead><tr><th>Category</th><th>Segment</th><th>Rental + VAT</th><th>Points</th><th>Effective From</th><th>Status</th><th>Actions</th></tr></thead><tbody id="ruleRows"></tbody></table></div>
+  <div class="acts" style="margin-top:12px"><button type="button" class="btn" data-close>Close</button></div>
+</dialog>
+<dialog id="dRule"><form id="fRule" novalidate>
+  <h2 id="ruleTitle">Add Rule</h2>
+  <label>Segment<select id="rSeg"></select></label>
+  <div class="two"><label>Rental + VAT<input type="number" id="rRent" min="0" step="any"></label><label>Points<input type="number" id="rPts" min="0" step="any"></label></div>
+  <label>Effective From<input type="date" id="rDate"></label>
+  <p class="err" id="rerr"></p>
+  <div class="acts"><button type="button" class="btn" data-close>Cancel</button><button class="btn pri">Save Rule</button></div>
+</form></dialog>
+
+<dialog id="dConf">
+  <p id="confMsg" style="margin:0 0 16px;font-weight:600"></p>
+  <div class="acts"><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn pri" id="confOk"></button></div>
+</dialog>
+
+<div id="toast" role="status"></div>
+
+</div>
+<dialog id="pinDialog"><form id="pinForm"><h2>Change PIN</h2><p id="pinReason">Choose an 8 to 12 digit PIN.</p><label>Current PIN<input id="currentPin" type="password" inputmode="numeric" required autocomplete="current-password"></label><label>New PIN<input id="newPin" type="password" inputmode="numeric" pattern="[0-9]{8,12}" minlength="8" maxlength="12" required autocomplete="new-password"></label><label>Confirm PIN<input id="confirmPin" type="password" inputmode="numeric" required autocomplete="new-password"></label><p class="err" id="pinError" role="alert"></p><div class="acts"><button type="button" class="btn" id="cancelPin">Cancel</button><button class="btn pri">Save PIN</button></div></form></dialog>
+<dialog id="usersDialog" style="width:min(800px,calc(100% - 24px))"><h2>Team accounts</h2><div id="usersList" class="scroll"></div><h2 style="margin-top:22px">Create account</h2><form id="userForm"><div class="two"><label>Username<input id="newUser" pattern="[A-Za-z0-9_]{3,30}" maxlength="30" required></label><label>Display name<input id="newName" maxlength="100" required></label><label>Temporary PIN<input id="userPin" type="password" inputmode="numeric" pattern="[0-9]{8,12}" minlength="8" maxlength="12" required autocomplete="new-password"></label><label>Role<select id="newRole"><option value="agent">Agent</option><option value="manager">Manager</option></select></label></div><p class="err" id="userError" role="alert"></p><div class="acts"><button class="btn" type="button" data-close>Close</button><button class="btn pri">Create account</button></div></form></dialog>
+<dialog id="resetDialog"><form id="resetForm"><h2>Reset temporary PIN</h2><p id="resetName"></p><label>New temporary PIN<input id="resetPin" type="password" inputmode="numeric" pattern="[0-9]{8,12}" minlength="8" maxlength="12" required autocomplete="new-password"></label><p id="resetError" class="err" role="alert"></p><div class="acts"><button type="button" class="btn" data-close>Cancel</button><button class="btn pri">Reset PIN</button></div></form></dialog>
+<script src="/app.js" defer></script></body></html>
