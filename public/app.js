@@ -1,4 +1,4 @@
-let profile=null,raw=null,selectedAgent=null,snapshot=null,saving=false,resetUser=null;
+let profile=null,raw=null,selectedAgent=null,snapshot=null,saving=false,resetUser=null,pendingToast=null;
 async function api(route,body){
  const r=await fetch('/api/'+route,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
  const d=await r.json();if(!r.ok)throw new Error(d.error||'Request failed');return d;
@@ -34,10 +34,11 @@ async function queueSave(){
  diff('rules',keyed(before.rules),keyed(after.rules));
  if(agent!=='all'){diff('targets',before.targets,after.targets);diff('sales',keyed(before.sales),keyed(after.sales))}
  if(!changes.length)return;
- saving=true;document.querySelector('#saveStatus').textContent='Saving changes…';document.body.classList.add('saving');
- try{await api('save',{changes});await reload();document.querySelector('#saveStatus').textContent='All changes saved';}
- catch(e){S=clone(before);render();document.querySelector('#saveStatus').textContent='Changes were not saved. '+e.message;toast(e.message,'err');}
- finally{saving=false;document.body.classList.remove('saving')}
+ saving=true;document.querySelector('#saveStatus').textContent='Saving changes…';document.body.classList.add('saving');document.querySelector('#app').inert=true;
+ let success=false;
+ try{await api('save',{changes});await reload();renderRules();document.querySelector('#saveStatus').textContent='All changes saved';success=true;}
+ catch(e){S=clone(before);render();renderRules();document.querySelector('#saveStatus').textContent='Changes were not saved. '+e.message;toast(e.message,'err');}
+ finally{saving=false;document.body.classList.remove('saving');document.querySelector('#app').inert=false;const queued=pendingToast;pendingToast=null;if(success&&queued)toast(queued.m,queued.k)}
 }
 function renderTeam(){
  const select=document.querySelector('#agentView');select.innerHTML='<option value="all">All team</option>'+raw.profiles.map(p=>`<option value="${p.id}">${esc(p.display_name)} (${esc(p.username)})${p.active?'':' · disabled'}</option>`).join('');select.value=selectedAgent;
@@ -57,6 +58,7 @@ async function signedIn(p){
  await reload();document.querySelector('#auth').hidden=true;document.querySelector('#app').hidden=false;
 }
 async function start(){
+ for(const type of ['click','submit','change','keydown'])document.addEventListener(type,e=>{if(saving){e.preventDefault();e.stopImmediatePropagation()}},true);
  const setup=new URLSearchParams(location.search).has('setup');document.querySelector('#setupForm').hidden=!setup;document.querySelector('#loginForm').hidden=setup;
  document.querySelector('#loginForm').onsubmit=async e=>{e.preventDefault();const button=document.querySelector('#loginButton');button.disabled=true;document.querySelector('#loginError').textContent='';try{const {profile:p}=await api('login',{username:document.querySelector('#loginUser').value,pin:document.querySelector('#loginPin').value});document.querySelector('#loginPin').value='';await signedIn(p)}catch(e){document.querySelector('#loginError').textContent=e.message}finally{button.disabled=false}};
  document.querySelector('#setupForm').onsubmit=async e=>{e.preventDefault();const pin=document.querySelector('#setupPin').value;if(pin!==document.querySelector('#setupConfirm').value)return document.querySelector('#setupError').textContent='The PINs do not match';try{await api('bootstrap',{code:document.querySelector('#setupCode').value,pin});location.replace('/')}catch(e){document.querySelector('#setupError').textContent=e.message}};
@@ -76,14 +78,14 @@ async function start(){
 }
 
 
-/* ===== DATA MODEL (localStorage key "salesDash.v1"; maps 1:1 to future DB tables) =====
+/* ===== DATA MODEL (stored in Supabase with per-agent access controls) =====
    targets: { "2026-10": { postpaid: 179, broadband: 112 } }
    sales:   [{ id, saleType:"new", orderNo, msisdn, date:"YYYY-MM-DD", segment, rental, points, createdAt }]
    settings:{ month, trend }
    targets may also hold postpaidArpu / hbbArpu / mbbArpu / fiberArpu (optional, per month; hbbArpu is used by 5G TDD)
    upgrade sale: saleType "upgrade", previousRental, newRental (no VAT), arpuAtSale, points = (new - previous) / arpuAtSale
    rules: [{ id, segment, rental, points, effectiveFrom, version, archived? }]; a new sale stores ruleId, ruleEffectiveFrom, pointsAtSale */
-const KEY='salesDash.v1';
+
 /* Seed table: used ONCE to create the editable Sales Rules on first run. After that, S.rules is the source of truth. */
 const RULES={new:{
   'Postpaid Voice':{cat:'Postpaid',pts:{'9.5':1,'10.5':1,'11':1,'12.5':1,'15':1.5,'22':2}},
@@ -107,7 +109,7 @@ const f=n=>String(Math.round(n*100)/100);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const total=a=>a.reduce((t,x)=>t+x.points,0);
-let tt;function toast(m,k){const t=$('#toast');t.textContent=m;t.className='show '+(k||'');clearTimeout(tt);tt=setTimeout(()=>{t.className=''},3200)}
+let tt;function toast(m,k){if(saving&&k!=='err'){pendingToast={m,k};return}const t=$('#toast');t.textContent=m;t.className='show '+(k||'');clearTimeout(tt);tt=setTimeout(()=>{t.className=''},3200)}
 
 /* ===== storage ===== */
 const fresh=()=>({version:1,settings:{trend:'both'},targets:{},sales:[]});
@@ -162,7 +164,7 @@ function rows(){
   const ms=all.filter(x=>(cat==='All'||catOf(x.segment)===cat)&&(typ==='all'||x.saleType===typ)&&(!q||x.orderNo.toLowerCase().includes(q)||x.msisdn.toLowerCase().includes(q)))
     .sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt);
   $('#rows').innerHTML=ms.length?ms.map(x=>{const c=catOf(x.segment),up=x.saleType==='upgrade';
-    return `<tr><td>${x.date}</td><td>${esc(x.orderNo)}</td><td>${esc(x.msisdn)}</td><td><span class="pill ${c==='Broadband'?'bb':''}">${c}</span></td><td>${x.segment}</td><td><span class="pill n">${up?'Upgrade':'New Sale'}</span></td><td>${up?`${x.previousRental} → ${x.newRental}`:`${x.rental} + VAT`}</td><td>${up?f(x.arpuAtSale):'—'}</td><td title="${x.points}"><b>${f(x.points)}</b></td><td><button class="btn sm" data-e="${x.id}">Edit</button> <button class="btn sm dng" data-d="${x.id}">Delete</button></td></tr>`}).join('')
+    return `<tr><td>${esc(x.date)}</td><td>${esc(x.orderNo)}</td><td>${esc(x.msisdn)}</td><td><span class="pill ${c==='Broadband'?'bb':''}">${c}</span></td><td>${esc(x.segment)}</td><td><span class="pill n">${up?'Upgrade':'New Sale'}</span></td><td>${up?`${esc(x.previousRental)} → ${esc(x.newRental)}`:`${esc(x.rental)} + VAT`}</td><td>${up?f(x.arpuAtSale):'—'}</td><td title="${x.points}"><b>${f(x.points)}</b></td><td><button class="btn sm" data-e="${esc(x.id)}">Edit</button> <button class="btn sm dng" data-d="${esc(x.id)}">Delete</button></td></tr>`}).join('')
     :`<tr><td colspan="10" class="empty">${all.length?'No sales match your search or filter.':'No sales recorded for this month yet. Click “+ New Sale” to add one.'}</td></tr>`;
   document.querySelectorAll('#cats button').forEach(b=>b.classList.toggle('on',b.dataset.c===cat));
   document.querySelectorAll('#types button').forEach(b=>b.classList.toggle('on',b.dataset.y===typ));
@@ -321,13 +323,13 @@ function rentalsFor(seg,date,keep){
   if(keep!==''&&keep!=null&&!out.includes(+keep))out.push(+keep);return out.sort((a,b)=>a-b);
 }
 function keepOld(seg,r,d){const o=editId&&S.sales.find(x=>x.id===editId);return o&&o.saleType==='new'&&o.segment===seg&&String(o.rental)===String(r)&&o.date===d?o:null}
-const ruleUsed=r=>S.sales.filter(s=>s.ruleId===r.id).length;
+const ruleUsed=r=>raw.sales.filter(s=>s.record.ruleId===r.id).length;
 function renderRules(){
   const t=today(),ci=s=>[...SEGS.Postpaid,...SEGS.Broadband].indexOf(s);
   const L=S.rules.slice().sort((a,b)=>ci(a.segment)-ci(b.segment)||a.rental-b.rental||a.effectiveFrom.localeCompare(b.effectiveFrom));
   $('#ruleRows').innerHTML=L.length?L.map(r=>{
     const st=r.archived?'Archived':r.effectiveFrom>t?'Scheduled':getApplicableRule(r.segment,r.rental,t)===r?'Active':'Superseded';
-    return `<tr><td>${catOf(r.segment)}</td><td>${r.segment}</td><td>${r.rental}</td><td><b>${r.points}</b></td><td>${r.effectiveFrom}</td><td><span class="pill n">${st}</span></td><td>${r.archived?`<button class="btn sm" data-rr="${r.id}">Restore</button>`:`<button class="btn sm" data-re="${r.id}">Edit</button> <button class="btn sm dng" data-rd="${r.id}">Delete</button>`}</td></tr>`}).join('')
+    return `<tr><td>${catOf(r.segment)}</td><td>${r.segment}</td><td>${esc(r.rental)}</td><td><b>${esc(r.points)}</b></td><td>${esc(r.effectiveFrom)}</td><td><span class="pill n">${st}</span></td><td>${r.archived?`<button class="btn sm" data-rr="${esc(r.id)}">Restore</button>`:`<button class="btn sm" data-re="${esc(r.id)}">Edit</button> <button class="btn sm dng" data-rd="${esc(r.id)}">Delete</button>`}</td></tr>`}).join('')
     :'<tr><td colspan="7" class="empty">No rules yet. Click + Add Rule.</td></tr>';
 }
 let ruleEdit=null;

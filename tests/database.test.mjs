@@ -38,6 +38,15 @@ test('Database rules, snapshots and agent isolation',async t=>{
  });
  await t.test('duplicate order is case insensitive per agent',async()=>assert.rejects(sale('dup',1,{...base,orderNo:'o1'}),/duplicate key/));
  await as(0);
+ await t.test('used rule may have a same-date successor without changing snapshots',async()=>{
+  const prior=(await query('select id from tracker_rules where record->>\'segment\'=\'Postpaid Voice\' and (record->>\'rental\')::numeric=15')).rows[0].id;
+  await query('insert into tracker_rules values($1,$2)',['successor',JSON.stringify({segment:'Postpaid Voice',rental:15,points:6,effectiveFrom:'2000-01-01',createdAt:1,prevId:prior,version:2})]);
+  assert.equal((await query('select record from tracker_sales where id=\'mine\'')).rows[0].record.points,1.5);
+ });
+ await t.test('record IDs cannot contain HTML attributes',async()=>assert.rejects(sale('bad" onclick="x',1,{...base,orderNo:'invalid-id'}),/check constraint/));
+ await t.test('malformed historical rentals are rejected transactionally',async()=>{
+  await assert.rejects(query('select tracker_import($1,$2)',[ids[2],JSON.stringify({targets:{},sales:[{...base,rental:'<img src=x>',points:1}]})]),/historical rental/);
+ });
  await t.test('new effective rule preserves existing sale snapshot',async()=>{
   await query('insert into tracker_rules values($1,$2)',['new-version',JSON.stringify({segment:'Postpaid Voice',rental:15,points:7,effectiveFrom:'2026-10-01',createdAt:1})]);
   await query('update tracker_targets set record=record||\'{"postpaidArpu":10}\'');

@@ -10,9 +10,9 @@ create table public.tracker_profiles (
  active boolean not null default true, must_change_pin boolean not null default true,
  created_at timestamptz not null default now()
 );
-create table public.tracker_rules(id text primary key,record jsonb not null);
+create table public.tracker_rules(id text primary key check(id ~ '^[A-Za-z0-9_-]{1,100}$'),record jsonb not null);
 create table public.tracker_targets(agent_id uuid references public.tracker_profiles(id),month text check(month ~ '^\d{4}-(0[1-9]|1[0-2])$'),record jsonb not null,primary key(agent_id,month));
-create table public.tracker_sales(id text primary key,agent_id uuid not null references public.tracker_profiles(id),record jsonb not null);
+create table public.tracker_sales(id text primary key check(id ~ '^[A-Za-z0-9_-]{1,100}$'),agent_id uuid not null references public.tracker_profiles(id),record jsonb not null);
 create unique index tracker_unique_order on public.tracker_sales(agent_id,lower(record->>'orderNo'));
 create index tracker_sales_agent on public.tracker_sales(agent_id);
 create index tracker_sales_month on public.tracker_sales((left(record->>'date',7)));
@@ -47,16 +47,16 @@ create policy sales_insert on public.tracker_sales for insert to authenticated w
 create policy sales_update on public.tracker_sales for update to authenticated using((select tracker_private.ready()) and (agent_id=(select auth.uid()) or (select tracker_private.manager()))) with check((select tracker_private.ready()) and (agent_id=(select auth.uid()) or (select tracker_private.manager())));
 create policy sales_delete on public.tracker_sales for delete to authenticated using((select tracker_private.ready()) and (agent_id=(select auth.uid()) or (select tracker_private.manager())));
 
-create function public.tracker_attempt(bucket text) returns boolean language plpgsql security invoker set search_path='' as $$
+create function public.tracker_attempt(bucket text,max_attempts integer default 8) returns boolean language plpgsql security invoker set search_path='' as $$
 declare n int;
 begin
  insert into tracker_private.attempts values(bucket,now(),1) on conflict(bucket) do update set
  attempts=case when attempts.started_at < now()-interval '15 minutes' then 1 else attempts.attempts+1 end,
  started_at=case when attempts.started_at < now()-interval '15 minutes' then now() else attempts.started_at end returning attempts into n;
- return n<=8;
+ return n<=max_attempts;
 end;$$;
-revoke all on function public.tracker_attempt(text) from public,anon,authenticated;
-grant execute on function public.tracker_attempt(text) to service_role;
+revoke all on function public.tracker_attempt(text,integer) from public,anon,authenticated;
+grant execute on function public.tracker_attempt(text,integer) to service_role;
 
 create function tracker_private.validate_record() returns trigger language plpgsql security invoker set search_path='' as $$
 declare r jsonb:=new.record; ru record; ar numeric; p numeric; field text; unchanged boolean:=false; importing boolean;
@@ -73,16 +73,18 @@ begin
   if coalesce(jsonb_typeof(r->'rental'),'')!='number' or not (r->>'rental')::numeric>0 or coalesce(jsonb_typeof(r->'points'),'')!='number' or not (r->>'points')::numeric>=0 or not coalesce(r->>'effectiveFrom','') ~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Invalid rule';end if;
   perform (r->>'effectiveFrom')::date;
   if tg_op='UPDATE' and (r-'archived') is distinct from (old.record-'archived') and exists(select 1 from public.tracker_sales where record->>'ruleId'=old.id) then raise exception 'Create a new version of a used rule';end if;
-  if exists(select 1 from public.tracker_rules t where t.id<>new.id and not coalesce((t.record->>'archived')::boolean,false) and not coalesce((r->>'archived')::boolean,false) and t.record->>'segment'=r->>'segment' and (t.record->>'rental')::numeric=(r->>'rental')::numeric and t.record->>'effectiveFrom'=r->>'effectiveFrom') then raise exception 'Duplicate active rule';end if;
+  if exists(select 1 from public.tracker_rules t where t.id<>new.id and t.id is distinct from r->>'prevId' and not coalesce((t.record->>'archived')::boolean,false) and not coalesce((r->>'archived')::boolean,false) and t.record->>'segment'=r->>'segment' and (t.record->>'rental')::numeric=(r->>'rental')::numeric and t.record->>'effectiveFrom'=r->>'effectiveFrom') then raise exception 'Duplicate active rule';end if;
   new.record:=r||jsonb_build_object('id',new.id);return new;
  end if;
  if tg_op='UPDATE' and new.agent_id<>old.agent_id then raise exception 'Sale ownership cannot change';end if;
- if length(trim(coalesce(r->>'orderNo','')))=0 or length(trim(coalesce(r->>'msisdn','')))=0 or not coalesce(r->>'date','') ~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Order, subscriber and sale date are required';end if;
+ importing:=coalesce(current_setting('tracker.import',true),'')='true' and tracker_private.manager();
+ if coalesce(jsonb_typeof(r->'orderNo'),'')!='string' or coalesce(jsonb_typeof(r->'msisdn'),'')!='string' or length(trim(coalesce(r->>'orderNo','')))=0 or (not importing and length(trim(coalesce(r->>'msisdn','')))=0) or not coalesce(r->>'date','') ~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Order, subscriber and sale date are required';end if;
  perform (r->>'date')::date;
  if coalesce(r->>'saleType','') not in ('new','upgrade') then raise exception 'Invalid sale type';end if;
- importing:=coalesce(current_setting('tracker.import',true),'')='true' and tracker_private.manager();
  if importing then
   if coalesce(jsonb_typeof(r->'points'),'')!='number' or not (r->>'points')::numeric>=0 then raise exception 'Invalid historical points';end if;
+  if r->>'saleType'='new' and coalesce(jsonb_typeof(r->'rental'),'')!='number' then raise exception 'Invalid historical rental';end if;
+  if r->>'saleType'='upgrade' and (coalesce(jsonb_typeof(r->'previousRental'),'')!='number' or coalesce(jsonb_typeof(r->'newRental'),'')!='number' or coalesce(jsonb_typeof(r->'arpuAtSale'),'')!='number') then raise exception 'Invalid historical upgrade';end if;
   new.record:=r||jsonb_build_object('id',new.id,'pointsAtSale',(r->>'points')::numeric);return new;
  end if;
  if tg_op='UPDATE' then
@@ -151,7 +153,7 @@ begin
   insert into public.tracker_targets values(agent,m.key,r-'tddArpu');
  end loop;
  for r in select * from jsonb_array_elements(backup->'sales') loop
-  k:=gen_random_uuid()::text;r:=jsonb_build_object('saleType','new','createdAt',0)||r;
+  k:=gen_random_uuid()::text;r:=jsonb_build_object('saleType','new','createdAt',0,'msisdn','')||r;
   if r->>'segment'='HBB' then r:=r||jsonb_build_object('segment','5G TDD');end if;
   if r ? 'arpuUsed' and not r ? 'arpuAtSale' then r:=r||jsonb_build_object('arpuAtSale',r->'arpuUsed');end if;
   insert into public.tracker_sales values(k,agent,r-'arpuUsed');

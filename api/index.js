@@ -23,7 +23,7 @@ export default async function handler(req,res){
  `tracker_access=${clear?'':s.access_token}; HttpOnly;${secure} SameSite=Strict; Path=/; Max-Age=${clear?0:3600}`,
  `tracker_refresh=${clear?'':s.refresh_token}; HttpOnly;${secure} SameSite=Strict; Path=/; Max-Age=${clear?0:604800}`]);
  const rpc=(name,body,token,admin=false)=>sb(`/rest/v1/rpc/${name}`,{method:'POST',body,token,admin});
- const limit=async(identity)=>{const ip=String(req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0];const results=await Promise.all([rpc('tracker_attempt',{bucket:hash(`ip:${ip}`)},null,true),rpc('tracker_attempt',{bucket:hash(`account:${identity}`)},null,true)]);if(results.some(v=>!v)){const e=new Error('Too many attempts. Please wait 15 minutes.');e.status=429;throw e}};
+ const limit=async(identity)=>{const ip=String(req.headers['x-forwarded-for']||req.socket?.remoteAddress||'unknown').split(',')[0];const results=await Promise.all([rpc('tracker_attempt',{bucket:hash(`ip:${ip}`),max_attempts:120},null,true),rpc('tracker_attempt',{bucket:hash(`account:${identity}`),max_attempts:8},null,true)]);if(results.some(v=>!v)){const e=new Error('Too many attempts. Please wait 15 minutes.');e.status=429;throw e}};
  try{
   if(route==='login'&&post){
    const name=username(b.username);await limit(name);if(!validName(name)||!validPin(b.pin))return res.status(401).json({error:'Username or PIN is incorrect'});
