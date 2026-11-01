@@ -1,23 +1,32 @@
-let profile=null,raw=null,selectedAgent=null,snapshot=null,saving=false,resetUser=null,pendingToast=null;
+let profile=null,raw=null,selectedAgent=null,snapshot=null,saving=false,resetUser=null,pendingToast=null,teamProvisioning=false;
 async function api(route,body){
  const r=await fetch('/api/'+route,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
  const d=await r.json();if(!r.ok)throw new Error(d.error||'Request failed');return d;
 }
 const clone=v=>JSON.parse(JSON.stringify(v));
+function teamTargetFor(month,profiles,targets,teamTargets){
+ const agents=new Set(profiles.filter(p=>p.role==='agent').map(p=>p.id));
+ const combined={postpaid:0,broadband:0};
+ for(const t of targets)if(agents.has(t.agent_id)&&t.month===month)for(const c of ['postpaid','broadband'])combined[c]+=Number(t.record[c]||0);
+ const saved=teamTargets?.find(t=>t.month===month)?.record;const mode=saved?.mode==='manual'?'manual':'sum';
+ const target=mode==='manual'?Object.fromEntries(['postpaid','broadband'].map(c=>[c,Math.min(Number(saved[c]||0),combined[c])])):{...combined};
+ return{combined,target,mode};
+}
 function stateFor(agent){
  const all=agent==='all';const targets={};
- for(const t of raw.targets.filter(t=>all||t.agent_id===agent)){
-  if(all){targets[t.month]||={postpaid:0,broadband:0};targets[t.month].postpaid+=Number(t.record.postpaid||0);targets[t.month].broadband+=Number(t.record.broadband||0)}else targets[t.month]=clone(t.record);
- }
- return migrate({version:1,settings:{trend:S?.settings.trend||'both'},targets,sales:raw.sales.filter(s=>all||s.agent_id===agent).map(s=>clone(s.record)),rules:raw.rules.map(r=>clone(r.record))});
+ const agents=new Set(raw.profiles.filter(p=>p.role==='agent').map(p=>p.id));
+ if(all){for(const month of new Set([...raw.targets.map(t=>t.month),...(raw.teamTargets||[]).map(t=>t.month)]))targets[month]=teamTargetFor(month,raw.profiles,raw.targets,raw.teamTargets).target}
+ else for(const t of raw.targets.filter(t=>t.agent_id===agent))targets[t.month]=clone(t.record);
+ return migrate({version:1,settings:{trend:S?.settings.trend||'both'},targets,sales:raw.sales.filter(s=>all?agents.has(s.agent_id):s.agent_id===agent).map(s=>clone(s.record)),rules:raw.rules.map(r=>clone(r.record))});
 }
 function applyView(){
  S=stateFor(selectedAgent);snapshot=clone(S);const manager=profile.role==='manager',all=selectedAgent==='all';
  document.querySelector('#managerPanel').hidden=!manager;
- document.querySelector('#bTarget').hidden=!manager;document.querySelector('#bRules').hidden=!manager;document.querySelector('#bRestore').hidden=!manager;
+ document.querySelector('#teamTargetNote').hidden=!manager;
+ document.querySelector('#bTarget').hidden=!manager||all;document.querySelector('#bTeamTarget').hidden=!manager||!all;document.querySelector('#bRules').hidden=!manager;document.querySelector('#bRestore').hidden=!manager;
  document.querySelector('#bTarget').disabled=all;document.querySelector('#bNew').disabled=all;document.querySelector('#bRestore').disabled=all;
  document.querySelector('#bBackup').disabled=all;
- document.querySelector('#pageTitle').textContent=all?'Team performance':selectedAgent===profile.id?'My performance':(raw.profiles.find(p=>p.id===selectedAgent)?.display_name||'Agent')+' · Performance';
+ document.querySelector('#pageTitle').textContent=all?'Team performance · AM791':selectedAgent===profile.id?'My performance':(raw.profiles.find(p=>p.id===selectedAgent)?.display_name||'Agent')+' · Performance';
  document.querySelector('#accountName').textContent=profile.username+' · '+profile.role;
  document.querySelector('#app').classList.toggle('team-view',all);
  render();
@@ -41,17 +50,31 @@ async function queueSave(){
  finally{saving=false;document.body.classList.remove('saving');document.querySelector('#app').inert=false;const queued=pendingToast;pendingToast=null;if(success&&queued)toast(queued.m,queued.k)}
 }
 function renderTeam(){
- const select=document.querySelector('#agentView');select.innerHTML='<option value="all">All team</option>'+raw.profiles.map(p=>`<option value="${p.id}">${esc(p.display_name)} (${esc(p.username)})${p.active?'':' · disabled'}</option>`).join('');select.value=selectedAgent;
- const table=raw.profiles.map(p=>{const sales=raw.sales.filter(s=>s.agent_id===p.id&&mKey(s.record.date)===view).map(s=>s.record),t=raw.targets.find(t=>t.agent_id===p.id&&t.month===view)?.record||{},post=total(sales.filter(s=>catOf(s.segment)==='Postpaid')),bb=total(sales.filter(s=>catOf(s.segment)==='Broadband'));
+ const agents=raw.profiles.filter(p=>p.role==='agent');
+ const select=document.querySelector('#agentView');select.innerHTML='<option value="all">All team · AM791</option>'+agents.map(p=>`<option value="${p.id}">${esc(p.display_name)} (${esc(p.username)})${p.active?'':' · disabled'}</option>`).join('');select.value=selectedAgent;
+ const totals=teamTargetFor(view,raw.profiles,raw.targets,raw.teamTargets);
+ document.querySelector('#teamTargetNote').textContent=`Team owner: AM791. ${totals.mode==='manual'?'Custom team target':'Combined agent targets'}: Postpaid ${f(totals.target.postpaid)}, Broadband ${f(totals.target.broadband)}. Agents combined: ${f(totals.combined.postpaid)} / ${f(totals.combined.broadband)}.`;
+ const table=agents.map(p=>{const sales=raw.sales.filter(s=>s.agent_id===p.id&&mKey(s.record.date)===view).map(s=>s.record),t=raw.targets.find(t=>t.agent_id===p.id&&t.month===view)?.record||{},post=total(sales.filter(s=>catOf(s.segment)==='Postpaid')),bb=total(sales.filter(s=>catOf(s.segment)==='Broadband'));
   const achievement=(points,target)=>target>0?(points/target*100).toFixed(2)+'%':'No target';
   return `<tr><td><button class="btn sm" data-agent="${p.id}">${esc(p.display_name)}</button><small class="sub"> ${esc(p.username)}</small></td><td>${sales.length}</td><td>${f(post)} / ${t.postpaid??'—'}</td><td>${achievement(post,t.postpaid)}</td><td>${f(bb)} / ${t.broadband??'—'}</td><td>${achievement(bb,t.broadband)}</td></tr>`;
  });
- document.querySelector('#teamTable').innerHTML='<table style="min-width:660px"><thead><tr><th>Agent</th><th>Sales</th><th>Postpaid points / target</th><th>Achievement</th><th>Broadband points / target</th><th>Achievement</th></tr></thead><tbody>'+table.join('')+'</tbody></table>';
+ document.querySelector('#teamTable').innerHTML='<table style="min-width:660px"><thead><tr><th>Agent</th><th>Sales</th><th>Postpaid points / target</th><th>Achievement</th><th>Broadband points / target</th><th>Achievement</th></tr></thead><tbody>'+(table.join('')||'<tr><td colspan="6" class="empty">Create your agents to start setting monthly targets.</td></tr>')+'</tbody></table>';
 }
 function userList(){
  document.querySelector('#usersList').innerHTML='<table style="min-width:550px"><thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+raw.profiles.map(p=>`<tr><td>${esc(p.username)}</td><td>${esc(p.display_name)}</td><td>${p.role}</td><td>${p.active?'Active':'Disabled'}${p.must_change_pin?' · PIN change required':''}</td><td>${p.username==='AM791'?'Main account':`<button class="btn sm" data-reset="${esc(p.username)}">Reset PIN</button> <button class="btn sm" data-toggle="${esc(p.username)}">${p.active?'Disable':'Enable'}</button>`}</td></tr>`).join('')+'</tbody></table>';
  document.querySelector('#newRole').disabled=profile.username!=='AM791';
+ const wanted=['BF01387','BF01049','BF01525','BF01437','BF01545','BF01539','BF01484','BF01565','BF01278','BF01171','BF01441'];
+ document.querySelector('#provisionTeam').hidden=profile.username!=='AM791'||wanted.every(u=>raw.profiles.some(p=>p.username===u));
 }
+function fillTeamTarget(){
+ const month=document.querySelector('#teamMonth').value;const t=teamTargetFor(month,raw.profiles,raw.targets,raw.teamTargets);
+ document.querySelector('#teamMode').value=t.mode;document.querySelector('#teamPost').value=t.target.postpaid;document.querySelector('#teamBb').value=t.target.broadband;
+ document.querySelector('#teamPost').max=t.combined.postpaid;document.querySelector('#teamBb').max=t.combined.broadband;
+ document.querySelector('#teamCombined').textContent=`Combined agent targets: Postpaid ${f(t.combined.postpaid)}, Broadband ${f(t.combined.broadband)}.`;
+ setTeamMode();
+}
+function setTeamMode(){const manual=document.querySelector('#teamMode').value==='manual';document.querySelector('#teamCustom').hidden=!manual;for(const id of ['#teamPost','#teamBb']){document.querySelector(id).required=manual;document.querySelector(id).disabled=!manual}}
+function lockMutations(){if(saving)return null;saving=true;document.querySelector('#app').inert=true;document.body.classList.add('saving');return()=>{saving=false;document.querySelector('#app').inert=false;document.body.classList.remove('saving');const queued=pendingToast;pendingToast=null;if(queued)toast(queued.m,queued.k)}}
 async function signedIn(p){
  profile=p;selectedAgent=p.role==='manager'?'all':p.id;
  if(p.must_change_pin){document.querySelector('#pinReason').textContent='Change your temporary PIN before using your dashboard.';document.querySelector('#cancelPin').textContent='Sign out';document.querySelector('#pinDialog').showModal();return}
@@ -73,6 +96,10 @@ async function start(){
  document.querySelector('#pinDialog').addEventListener('cancel',e=>{if(profile.must_change_pin)e.preventDefault()});
  document.querySelector('#pinForm').onsubmit=async e=>{e.preventDefault();const pin=document.querySelector('#newPin').value;if(pin!==document.querySelector('#confirmPin').value)return document.querySelector('#pinError').textContent='The PINs do not match';try{await api('pin',{currentPin:document.querySelector('#currentPin').value,pin});document.querySelector('#pinForm').reset();document.querySelector('#pinDialog').close();profile.must_change_pin=false;await signedIn(profile);toast('PIN updated')}catch(e){document.querySelector('#pinError').textContent=e.message}};
  document.querySelector('#manageUsers').onclick=()=>{userList();document.querySelector('#usersDialog').showModal()};
+ document.querySelector('#bTeamTarget').onclick=()=>{document.querySelector('#teamMonth').value=view;fillTeamTarget();document.querySelector('#teamTargetError').textContent='';document.querySelector('#teamTargetDialog').showModal()};
+ document.querySelector('#teamMonth').onchange=fillTeamTarget;document.querySelector('#teamMode').onchange=setTeamMode;
+ document.querySelector('#teamTargetForm').onsubmit=async e=>{e.preventDefault();const unlock=lockMutations();if(!unlock)return;const button=document.querySelector('#saveTeamTarget');button.disabled=true;try{const month=document.querySelector('#teamMonth').value;await api('team-target',{month,mode:document.querySelector('#teamMode').value,postpaid:Number(document.querySelector('#teamPost').value),broadband:Number(document.querySelector('#teamBb').value)});view=month;await reload();document.querySelector('#teamTargetDialog').close();toast('Team target saved for AM791')}catch(e){document.querySelector('#teamTargetError').textContent=e.message}finally{button.disabled=false;unlock()}};
+ document.querySelector('#provisionTeam').onclick=async()=>{if(teamProvisioning)return;const unlock=lockMutations();if(!unlock)return;teamProvisioning=true;const button=document.querySelector('#provisionTeam');button.disabled=true;document.querySelector('#provisionStatus').textContent='Creating the requested team accounts…';try{const result=await api('provision-team',{});if(result.created.length){const csv='Username,Temporary PIN,First login\r\n'+result.created.map(u=>`${u.username},${u.pin},Change PIN required`).join('\r\n');dl('agent-temporary-pins.csv','text/csv',csv)}await reload();userList();document.querySelector('#provisionStatus').textContent=`Created ${result.created.length} accounts. ${result.skipped.length} already existed. ${result.errors.length} could not be created.`;if(result.created.length)document.querySelector('#provisionStatus').textContent+=' Temporary PINs were downloaded. Keep the file private.';}catch(e){document.querySelector('#provisionStatus').textContent=e.message}finally{teamProvisioning=false;button.disabled=false;unlock()}};
  document.querySelector('#userForm').onsubmit=async e=>{e.preventDefault();try{await api('users',{action:'create',username:document.querySelector('#newUser').value,display_name:document.querySelector('#newName').value,pin:document.querySelector('#userPin').value,role:document.querySelector('#newRole').value});document.querySelector('#userForm').reset();await reload();userList();toast('Account created. Share the temporary PIN with this agent.')}catch(e){document.querySelector('#userError').textContent=e.message}};
  document.querySelector('#usersList').onclick=async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.reset){resetUser=b.dataset.reset;document.querySelector('#resetName').textContent=resetUser;document.querySelector('#resetDialog').showModal()}if(b.dataset.toggle){try{await api('users',{action:'toggle',username:b.dataset.toggle});await reload();userList()}catch(e){toast(e.message,'err')}}};
  document.querySelector('#resetForm').onsubmit=async e=>{e.preventDefault();try{await api('users',{action:'reset',username:resetUser,pin:document.querySelector('#resetPin').value});document.querySelector('#resetForm').reset();document.querySelector('#resetDialog').close();await reload();userList();toast('Temporary PIN reset')}catch(e){document.querySelector('#resetError').textContent=e.message}};

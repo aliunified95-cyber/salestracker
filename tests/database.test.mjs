@@ -12,6 +12,7 @@ const base={saleType:'new',orderNo:'O1',msisdn:'39000000',date:'2026-10-02',segm
 test('Database rules, snapshots and agent isolation',async t=>{
  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`);
  await db.exec(await readFile('database/schema.sql','utf8'));
+ await db.exec(await readFile('database/team-targets.sql','utf8'));
  await t.test('service limiter counts attempts and blocks the ninth',async()=>{
   await db.exec('set role service_role');
   for(let n=1;n<=9;n++)assert.equal((await query('select tracker_attempt($1) as allowed',['test-bucket'])).rows[0].allowed,n<=8);
@@ -25,7 +26,19 @@ test('Database rules, snapshots and agent isolation',async t=>{
   assert.equal(count,22);let n=0;for(const [segment,v]of Object.entries(RULES.new))for(const [rental,points]of Object.entries(v.pts)){await sale('seed-sale-'+(++n),1,{...base,orderNo:'S'+n,segment,rental:+rental});const r=await query('select record from tracker_sales where id=$1',['seed-sale-'+n]);assert.equal(r.rows[0].record.points,points)}
  });
  await query('insert into tracker_targets values($1,$2,$3)',[ids[1],'2026-10',JSON.stringify({postpaid:179,broadband:112,postpaidArpu:8,mbbArpu:10,fiberArpu:15,hbbArpu:15})]);
+ await t.test('AM791 owns team target and manager can choose sum or lower',async()=>{
+  await query('insert into tracker_team_targets(month,owner_id,record) values($1,$2,$3)',['2026-10',ids[0],JSON.stringify({mode:'sum'})]);
+  await query('update tracker_team_targets set record=$1 where month=\'2026-10\'',[JSON.stringify({mode:'manual',postpaid:150,broadband:100})]);
+  assert.equal((await query('select record from tracker_targets where agent_id=$1',[ids[1]])).rows[0].record.postpaid,179);
+  await assert.rejects(query('update tracker_team_targets set record=$1',[JSON.stringify({mode:'manual',postpaid:180,broadband:100})]),/cannot exceed/);
+  await assert.rejects(query('update tracker_team_targets set owner_id=$1',[ids[1]]),/AM791/);
+  await query('update tracker_team_targets set record=\'{"mode":"sum"}\'');
+ });
  await as(1);
+ await t.test('agent cannot read or change team targets',async()=>{
+  assert.equal((await query('select * from tracker_team_targets')).rows.length,0);
+  await assert.rejects(query('insert into tracker_team_targets(month,owner_id,record) values($1,$2,$3)',['2026-11',ids[0],JSON.stringify({mode:'sum'})]),/Manager access/);
+ });
  await t.test('agents cannot read another profile or sales',async()=>{await sale('mine',1,base);assert.equal((await query('select * from tracker_profiles')).rows.length,1);assert.equal((await query('select * from tracker_sales where agent_id=$1',[ids[2]])).rows.length,0)});
  await t.test('agent cannot insert another agent sale',async()=>assert.rejects(sale('foreign',2,{...base,orderNo:'foreign'}),/row-level security/));
  await t.test('agent cannot alter targets, rules, role or limiter',async()=>{

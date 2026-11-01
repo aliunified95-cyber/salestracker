@@ -12,5 +12,8 @@ Preserve the five segments, 22 source rentals, upgrade formula, unrounded points
 ## Brand commitment
 Zain colors and official Zain logo. Keep the source's useful dashboard structure. Use a restrained operational interface with clear tables and forms.
 
-## Open setup
-The user created the dedicated salestracker Supabase project anjgkfhhwxxpelttklhd in aliunified95-cyber's Org. The database schema was applied through the Supabase SQL editor. Private Vercel credentials and the main account PIN remain user setup steps. Do not infer them from other projects.
+## Team targets and accounts
+AM791 owns team targets. Managers can choose each month's combined agent targets or a lower custom Postpaid and Broadband team target, preserving individual allocations. The user requested agent accounts BF01387, BF01049, BF01525, BF01437, BF01545, BF01539, BF01484, BF01565, BF01278, BF01171 and BF01441, each requiring a new PIN at first login.
+
+## Live setup
+The user created the dedicated salestracker Supabase project anjgkfhhwxxpelttklhd in aliunified95-cyber's Org and reported creating AM791. Database changes use the dedicated project only. Vercel server credentials are configured privately. Never infer credentials from other projects.

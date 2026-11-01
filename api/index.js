@@ -1,4 +1,5 @@
-import {createHash} from 'node:crypto';
+import {createHash,randomInt} from 'node:crypto';
+const TEAM_USERS=['BF01387','BF01049','BF01525','BF01437','BF01545','BF01539','BF01484','BF01565','BF01278','BF01171','BF01441'];
 const username=v=>String(v||'').trim().toUpperCase();
 const validName=v=>/^[A-Z0-9_]{3,30}$/.test(v);
 const validPin=v=>/^\d{8,12}$/.test(String(v||''));
@@ -13,8 +14,8 @@ export default async function handler(req,res){
  const b=req.body||{};const post=req.method==='POST';
  if(!['GET','POST'].includes(req.method))return res.status(405).json({error:'Method not allowed'});
  if(post&&req.headers.origin){const o=new URL(req.headers.origin);if(o.host!==req.headers.host)return res.status(403).json({error:'Request blocked'})}
- const sb=async(path,{method='GET',body,token,admin=false}={})=>{
-  const r=await fetch(`${url}${path}`,{method,headers:{apikey:admin?secret:key,Authorization:`Bearer ${admin?secret:token||key}`,'Content-Type':'application/json',Prefer:'return=representation'},body:body===undefined?undefined:JSON.stringify(body)});
+ const sb=async(path,{method='GET',body,token,admin=false,prefer='return=representation'}={})=>{
+  const r=await fetch(`${url}${path}`,{method,headers:{apikey:admin?secret:key,Authorization:`Bearer ${admin?secret:token||key}`,'Content-Type':'application/json',Prefer:prefer},body:body===undefined?undefined:JSON.stringify(body)});
   const data=await r.json().catch(()=>null);if(!r.ok){const e=new Error(data?.message||data?.msg||data?.error_description||'Unable to complete this request');e.status=r.status;throw e}return data;
  };
  const cookies=Object.fromEntries(String(req.headers.cookie||'').split(';').filter(x=>x.includes('=')).map(x=>{const i=x.indexOf('=');return[x.slice(0,i).trim(),decodeURIComponent(x.slice(i+1))]}));
@@ -51,9 +52,29 @@ export default async function handler(req,res){
    await sb('/auth/v1/user',{method:'PUT',token,body:{password:b.pin}});await sb(`/rest/v1/tracker_profiles?id=eq.${user.id}`,{method:'PATCH',admin:true,body:{must_change_pin:false}});return res.status(200).json({ok:true});}
   if(profile.must_change_pin)return res.status(403).json({error:'Please change your temporary PIN first'});
   if(route==='state'&&req.method==='GET'){
-   const allRows=async t=>{const result=[];for(let offset=0;;offset+=1000){const rows=await sb(`/rest/v1/${t}?select=*&order=${t==='tracker_targets'?'agent_id,month':'id'}&limit=1000&offset=${offset}`,{token});result.push(...rows);if(rows.length<1000)return result}};
-   const [profiles,sales,targets,rules]=await Promise.all(['tracker_profiles','tracker_sales','tracker_targets','tracker_rules'].map(allRows));
-   return res.status(200).json({profiles,sales,targets,rules});
+   const allRows=async t=>{const result=[];for(let offset=0;;offset+=1000){const rows=await sb(`/rest/v1/${t}?select=*&order=${t==='tracker_targets'?'agent_id,month':t==='tracker_team_targets'?'month':'id'}&limit=1000&offset=${offset}`,{token});result.push(...rows);if(rows.length<1000)return result}};
+   const [profiles,sales,targets,rules,teamTargets]=await Promise.all(['tracker_profiles','tracker_sales','tracker_targets','tracker_rules','tracker_team_targets'].map(allRows));
+   return res.status(200).json({profiles,sales,targets,rules,teamTargets});
+  }
+  if(route==='team-target'&&post){
+   if(profile.role!=='manager')return res.status(403).json({error:'Manager access required'});
+   if(!['sum','manual'].includes(b.mode))return res.status(400).json({error:'Choose combined or custom team targets'});
+   const owner=(await sb('/rest/v1/tracker_profiles?username=eq.AM791&select=id',{token}))[0];if(!owner)throw new Error('Main team owner not found');
+   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(b.month))throw new Error('Choose a valid month');
+   const record=b.mode==='sum'?{mode:'sum'}:{mode:'manual',postpaid:b.postpaid,broadband:b.broadband};
+   await sb('/rest/v1/tracker_team_targets?on_conflict=month',{method:'POST',token,body:{month:b.month,owner_id:owner.id,record},prefer:'resolution=merge-duplicates,return=representation'});
+   return res.status(200).json({ok:true});
+  }
+  if(route==='provision-team'&&post){
+   if(profile.role!=='manager'||profile.username!=='AM791')return res.status(403).json({error:'AM791 access required'});
+   const existing=await sb('/rest/v1/tracker_profiles?select=username',{admin:true});const known=new Set(existing.map(p=>p.username));const created=[],skipped=[],errors=[];
+   for(const name of TEAM_USERS){
+    if(known.has(name)){skipped.push(name);continue}
+    const pin=String(randomInt(10000000,100000000));let u;
+    try{u=await sb('/auth/v1/admin/users',{method:'POST',admin:true,body:{email:alias(name),password:pin,email_confirm:true}});await sb('/rest/v1/tracker_profiles',{method:'POST',admin:true,body:{id:u.id,username:name,display_name:name,role:'agent',must_change_pin:true}});created.push({username:name,pin});}
+    catch(e){if(u?.id)await sb(`/auth/v1/admin/users/${u.id}`,{method:'DELETE',admin:true}).catch(()=>{});errors.push({username:name,error:'Could not create this account. Existing accounts were left unchanged.'});}
+   }
+   return res.status(200).json({created,skipped,errors});
   }
   if(route==='save'&&post){if(!Array.isArray(b.changes)||b.changes.length>2000)return res.status(400).json({error:'Too many changes'});await rpc('tracker_save',{changes:b.changes},token);return res.status(200).json({ok:true})}
   if(route==='import'&&post){if(profile.role!=='manager')return res.status(403).json({error:'Manager access required'});await rpc('tracker_import',{agent:b.agent,backup:b.backup},token);return res.status(200).json({ok:true})}

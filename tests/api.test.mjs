@@ -27,10 +27,25 @@ test('Authentication and server boundaries',async t=>{
   await t.test('cross origin mutations are rejected',async()=>assert.equal((await request('login',{body:{},headers:{origin:'https://other.example'}})).statusCode,403));
   await t.test('persistent rate limiter blocks authentication',async()=>{allow=false;assert.equal((await request('login',{body:{username:'AGENT1',pin:'12345678'}})).statusCode,429);allow=true});
   await t.test('agents cannot create accounts',async()=>assert.equal((await request('users',{body:{action:'create',username:'ATTACKER',pin:'12345678'},headers:{cookie:'tracker_access=access-test'}})).statusCode,403));
+  await t.test('agents cannot provision the team or set team targets',async()=>{for(const route of ['provision-team','team-target'])assert.equal((await request(route,{body:{month:'2026-11',mode:'sum'},headers:{cookie:'tracker_access=access-test'}})).statusCode,403)});
   await t.test('temporary PIN users cannot load sales',async()=>{profile.must_change_pin=true;assert.equal((await request('state',{headers:{cookie:'tracker_access=access-test'}})).statusCode,403);profile.must_change_pin=false});
   await t.test('data requests use agent bearer token rather than service credentials',async()=>{
    const r=await request('state',{headers:{cookie:'tracker_access=access-test'}});assert.equal(r.statusCode,200);assert.ok(calls.filter(c=>c.url.includes('/rest/v1/tracker_sales')).every(c=>c.options.headers.Authorization==='Bearer access-test'));
   });
   await t.test('AM791 setup is unavailable without private setup code',async()=>{delete process.env.TRACKER_SETUP_CODE;assert.equal((await request('bootstrap',{body:{pin:'12345678',code:'guess'}})).statusCode,403)});
+  await t.test('only AM791 can provision the requested team',async()=>{profile.role='manager';assert.equal((await request('provision-team',{body:{},headers:{cookie:'tracker_access=access-test'}})).statusCode,403)});
+  await t.test('team provisioning creates exactly 11 agents with forced PIN change and never resets existing users',async()=>{
+   profile.username='AM791';const createdProfiles=[];const accounts=[];let seq=0;
+   global.fetch=async(url,options)=>{const body=options.body?JSON.parse(options.body):undefined;let result=[];
+    if(url.endsWith('/auth/v1/user'))result={id:profile.id};
+    else if(url.includes('/tracker_profiles?id='))result=[profile];
+    else if(url.includes('/tracker_profiles?select=username'))result=accounts;
+    else if(url.endsWith('/auth/v1/admin/users')){result={id:'created-'+(++seq)};assert.match(body.password,/^\d{8}$/)}
+    else if(url.endsWith('/tracker_profiles')&&options.method==='POST'){createdProfiles.push(body);accounts.push({username:body.username});result=[body]}
+    return{ok:true,json:async()=>result};
+   };
+   const r=await request('provision-team',{body:{},headers:{cookie:'tracker_access=access-test'}});assert.equal(r.data.created.length,11);assert.equal(createdProfiles.length,11);assert.ok(createdProfiles.every(p=>p.role==='agent'&&p.must_change_pin));assert.equal(new Set(createdProfiles.map(p=>p.username)).size,11);
+   const again=await request('provision-team',{body:{},headers:{cookie:'tracker_access=access-test'}});assert.equal(again.data.created.length,0);assert.equal(again.data.skipped.length,11);assert.equal(seq,11);
+  });
  }finally{global.fetch=original;for(const k of Object.keys(process.env))if(!(k in env))delete process.env[k];Object.assign(process.env,env)}
 });
