@@ -230,7 +230,7 @@ function render(){
   $('#brk').innerHTML=brk('Postpaid')+brk('Broadband');
   const td=today(),ts=ms.filter(x=>x.date===td),tp=c=>total(ts.filter(x=>catOf(x.segment)===c));
   $('#today').innerHTML=`<div class="ch"><h2>Today's Performance</h2><span class="sub">${view===td.slice(0,7)?td:'Today is outside the selected month'}</span></div><div class="tiles">`+
-    [["Today's Sales",ts.length],['Postpaid',f(tp('Postpaid'))+' Points'],['Broadband',f(tp('Broadband'))+' Points'],['Total',f(tp('Postpaid')+tp('Broadband'))+' Points']].map(([l,v])=>`<div class="tile"><small>${l}</small><b>${v}</b></div>`).join('')+'</div>';
+    [['Postpaid',f(tp('Postpaid'))+' Points'],['Broadband',f(tp('Broadband'))+' Points'],['Total',f(tp('Postpaid')+tp('Broadband'))+' Points']].map(([l,v])=>`<div class="tile"><small>${l}</small><b>${v}</b></div>`).join('')+'</div>';
   rows();
   if(profile?.role==='manager')renderTeam();
 }
