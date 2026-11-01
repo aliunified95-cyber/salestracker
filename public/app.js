@@ -399,7 +399,7 @@ $('#fRule').onsubmit=e=>{
   if(r&&r.segment===seg&&+r.rental===rent&&+r.points===pts&&r.effectiveFrom===d){}
   else if(r&&ruleUsed(r)){ // used by saved sales: keep the old rule untouched and add a new version
     S.rules.push({id:uid(),segment:seg,rental:rent,points:pts,effectiveFrom:d,version:(r.version||1)+1,prevId:r.id,createdAt:Date.now()});
-    msg='This rule is used by saved sales, so a new version was created. Saved sales are unchanged.';
+    msg='A new rule version was created. Saved sales are unchanged.';
   }
   else if(r)Object.assign(r,{segment:seg,rental:rent,points:pts,effectiveFrom:d});
   else S.rules.push({id:uid(),segment:seg,rental:rent,points:pts,effectiveFrom:d,version:1,createdAt:Date.now()});
