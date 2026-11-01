@@ -60,6 +60,8 @@ async function signedIn(p){
 async function start(){
  for(const type of ['click','submit','change','keydown'])document.addEventListener(type,e=>{if(saving){e.preventDefault();e.stopImmediatePropagation()}},true);
  const setup=new URLSearchParams(location.search).has('setup');document.querySelector('#setupForm').hidden=!setup;document.querySelector('#loginForm').hidden=setup;
+ const setupAccess=new URLSearchParams(location.hash.slice(1)).get('setup');
+ if(setup&&setupAccess){document.querySelector('#setupCode').value=setupAccess;document.querySelector('#setupCode').closest('label').hidden=true;history.replaceState(null,'',location.pathname+location.search);document.querySelector('#setupPin').focus()}
  document.querySelector('#loginForm').onsubmit=async e=>{e.preventDefault();const button=document.querySelector('#loginButton');button.disabled=true;document.querySelector('#loginError').textContent='';try{const {profile:p}=await api('login',{username:document.querySelector('#loginUser').value,pin:document.querySelector('#loginPin').value});document.querySelector('#loginPin').value='';await signedIn(p)}catch(e){document.querySelector('#loginError').textContent=e.message}finally{button.disabled=false}};
  document.querySelector('#setupForm').onsubmit=async e=>{e.preventDefault();const pin=document.querySelector('#setupPin').value;if(pin!==document.querySelector('#setupConfirm').value)return document.querySelector('#setupError').textContent='The PINs do not match';try{await api('bootstrap',{code:document.querySelector('#setupCode').value,pin});location.replace('/')}catch(e){document.querySelector('#setupError').textContent=e.message}};
  document.querySelector('#logout').onclick=async()=>{await api('logout',{});location.reload()};
