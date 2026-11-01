@@ -58,7 +58,7 @@ async function queueSave(){
  };
  const keyed=a=>Object.fromEntries(a.map(x=>[x.id,x]));
  diff('rules',keyed(before.rules),keyed(after.rules));
- if(agent!=='all'){diff('targets',before.targets,after.targets);diff('sales',keyed(before.sales),keyed(after.sales))}
+ if(agent!=='all'){diff('targets',before.targets,after.targets);diff('sales',keyed(before.sales),keyed(after.sales))} else {const old=keyed(before.sales);for(const record of after.sales){if(old[record.id]&&JSON.stringify(old[record.id])!==JSON.stringify(record)){const owner=raw.sales.find(x=>x.id===record.id)?.agent_id;if(!owner)throw new Error('Sale owner not found');changes.push({table:'sales',id:record.id,record,agent_id:owner,op:'upsert'})}}}
  if(!changes.length)return;
  saving=true;document.querySelector('#saveStatus').textContent='Saving changes…';document.body.classList.add('saving');document.querySelector('#app').inert=true;
  let success=false;
@@ -215,8 +215,8 @@ function rows(){
   const ms=all.filter(x=>(cat==='All'||catOf(x.segment)===cat)&&(typ==='all'||x.saleType===typ)&&(!q||x.orderNo.toLowerCase().includes(q)||x.msisdn.toLowerCase().includes(q)))
     .sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt);
   $('#rows').innerHTML=ms.length?ms.map(x=>{const c=catOf(x.segment),up=x.saleType==='upgrade';
-    return `<tr><td>${esc(x.date)}</td><td>${esc(x.orderNo)}</td><td>${esc(x.msisdn)}</td><td><span class="pill ${c==='Broadband'?'bb':''}">${c}</span></td><td>${esc(x.segment)}</td><td><span class="pill n">${up?'Upgrade':'New Sale'}</span></td><td>${up?`${esc(x.previousRental)} → ${esc(x.newRental)}`:`${esc(x.rental)} + VAT`}</td><td>${up?f(x.arpuAtSale):'—'}</td><td title="${x.points}"><b>${f(x.points)}</b></td><td><button class="btn sm" data-e="${esc(x.id)}">Edit</button> <button class="btn sm dng" data-d="${esc(x.id)}">Delete</button></td></tr>`}).join('')
-    :`<tr><td colspan="10" class="empty">${all.length?'No sales match your search or filter.':'No sales recorded for this month yet. Click “+ New Sale” to add one.'}</td></tr>`;
+    const row=raw.sales.find(s=>s.id===x.id),owner=raw.profiles.find(p=>p.id===row?.agent_id),creator=raw.profiles.find(p=>p.id===row?.created_by);return `<tr><td>${esc(x.date)}</td><td>${esc(owner?.username||'Unknown')}</td><td>${esc(creator?.username||(row?.created_by?'Other user':'Not recorded'))}</td><td>${esc(x.orderNo)}</td><td>${esc(x.msisdn)}</td><td><span class="pill ${c==='Broadband'?'bb':''}">${c}</span></td><td>${esc(x.segment)}</td><td><span class="pill n">${up?'Upgrade':'New Sale'}</span></td><td>${up?`${esc(x.previousRental)} → ${esc(x.newRental)}`:`${esc(x.rental)} + VAT`}</td><td>${up?f(x.arpuAtSale):'—'}</td><td title="${x.points}"><b>${f(x.points)}</b></td><td><button class="btn sm" data-e="${esc(x.id)}">Edit</button> <button class="btn sm dng" data-d="${esc(x.id)}">Delete</button></td></tr>`}).join('')
+    :`<tr><td colspan="12" class="empty">${all.length?'No sales match your search or filter.':'No sales recorded for this month yet. Click “+ New Sale” to add one.'}</td></tr>`;
   document.querySelectorAll('#cats button').forEach(b=>b.classList.toggle('on',b.dataset.c===cat));
   document.querySelectorAll('#types button').forEach(b=>b.classList.toggle('on',b.dataset.y===typ));
 }
@@ -246,7 +246,7 @@ const ARPU_INPUT={postpaidArpu:'#tPostArpu',hbbArpu:'#tHbbArpu',mbbArpu:'#tMbbAr
 const arpuName=seg=>ARPU_NAME[ARPU_FIELD[seg]];
 const arpuMsg=seg=>`Please set the monthly ARPU for this category before adding an upgrade. Missing: ${arpuName(seg)} ARPU.`;
 /* ARPU always comes from the month of the sale date, not the month being viewed */
-const getArpu=(date,seg)=>(raw.teamArpu?.find(x=>x.month===mKey(date))?.record||S.targets[mKey(date)]||{})[ARPU_FIELD[seg]];
+const getArpu=(date,seg)=>(raw.teamArpu?.find(x=>x.month===mKey(date))?.record||(selectedAgent==='all'?raw.targets.find(t=>t.agent_id===raw.sales.find(s=>s.id===editId)?.agent_id&&t.month===mKey(date))?.record:S.targets[mKey(date)])||{})[ARPU_FIELD[seg]];
 function upCalc(){
   const seg=$('#fSeg').value,d=$('#fDate').value,pr=parseFloat($('#fPrev').value),nx=parseFloat($('#fNext').value),arpu=seg&&d?getArpu(d,seg):undefined;
   const o=editId&&S.sales.find(x=>x.id===editId);
@@ -321,7 +321,7 @@ $('#fSale').onsubmit=e=>{
     p=u.pts;ex={saleType:'upgrade',rental:undefined,ruleId:undefined,ruleEffectiveFrom:undefined,previousRental:u.pr,newRental:u.nx,arpuAtSale:u.arpu};
   }
   if(p===null)return err('Rental not found in point table');
-  if(S.sales.some(x=>x.id!==editId&&x.orderNo.toLowerCase()===o.toLowerCase()))return err('This Order Number already exists.');
+  if(S.sales.some(x=>x.id!==editId&&(selectedAgent!=='all'||raw.sales.find(s=>s.id===x.id)?.agent_id===raw.sales.find(s=>s.id===editId)?.agent_id)&&x.orderNo.toLowerCase()===o.toLowerCase()))return err('This Order Number already exists.');
   const rec={...ex,orderNo:o,msisdn:m,date:d,segment:seg,points:p,pointsAtSale:p};
   if(editId)Object.assign(S.sales.find(x=>x.id===editId),rec);
   else S.sales.push({id:uid(),...rec,createdAt:Date.now()});
@@ -418,7 +418,7 @@ $('#types').onclick=e=>{const b=e.target.closest('[data-y]');if(b){typ=b.dataset
 $('#q').oninput=e=>{q=e.target.value.trim().toLowerCase();rows()};
 $('#rows').onclick=e=>{
   const b=e.target.closest('button');if(!b)return;
-  if(selectedAgent==='all')return;if(b.dataset.e)openSale(b.dataset.e);
+  if(b.dataset.e)openSale(b.dataset.e);if(selectedAgent==='all')return;
   if(b.dataset.d){const s=S.sales.find(x=>x.id===b.dataset.d);
     ask(`Delete order ${s.orderNo}? This cannot be undone.`,'Delete',()=>{S.sales=S.sales.filter(x=>x.id!==s.id);save();render();toast('Sale deleted')})}
 };
@@ -426,3 +426,4 @@ document.addEventListener('click',e=>{const c=e.target.closest('[data-close]');i
 
 
 start();
+

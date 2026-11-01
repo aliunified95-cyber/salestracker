@@ -15,6 +15,7 @@ test('Database rules, snapshots and agent isolation',async t=>{
  await db.exec(await readFile('database/team-targets.sql','utf8'));
  await db.exec(await readFile('database/admin-role.sql','utf8'));
  await db.exec(await readFile('database/team-arpu.sql','utf8'));
+ await db.exec(await readFile('database/sale-creator.sql','utf8'));
  await t.test('service limiter counts attempts and blocks the ninth',async()=>{
   await db.exec('set role service_role');
   for(let n=1;n<=9;n++)assert.equal((await query('select tracker_attempt($1) as allowed',['test-bucket'])).rows[0].allowed,n<=8);
@@ -40,6 +41,13 @@ test('Database rules, snapshots and agent isolation',async t=>{
  await t.test('agent cannot read or change team targets',async()=>{
   assert.equal((await query('select * from tracker_team_targets')).rows.length,0);
   await assert.rejects(query('insert into tracker_team_targets(month,owner_id,record) values($1,$2,$3)',['2026-11',ids[0],JSON.stringify({mode:'sum'})]),/Manager access/);
+ });
+ await t.test('creator is recorded and cannot be rewritten when a manager edits a sale',async()=>{
+  await as(1);await sale('creator-test',1,{...base,orderNo:'creator-test'});
+  assert.equal((await query("select created_by from tracker_sales where id='creator-test'")).rows[0].created_by,ids[1]);
+  await as(0);await query("update tracker_sales set created_by=$1,record=record||'{\"msisdn\":\"39999999\"}' where id='creator-test'",[ids[0]]);
+  assert.equal((await query("select created_by from tracker_sales where id='creator-test'")).rows[0].created_by,ids[1]);
+  await query("delete from tracker_sales where id='creator-test'");await as(1);
  });
  await t.test('agents cannot read another profile or sales',async()=>{await sale('mine',1,base);assert.equal((await query('select * from tracker_profiles')).rows.length,1);assert.equal((await query('select * from tracker_sales where agent_id=$1',[ids[2]])).rows.length,0)});
  await t.test('agent cannot insert another agent sale',async()=>assert.rejects(sale('foreign',2,{...base,orderNo:'foreign'}),/row-level security/));
@@ -108,3 +116,4 @@ test('Database rules, snapshots and agent isolation',async t=>{
  });
  await db.exec('reset role');await db.close();
 });
+
