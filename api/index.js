@@ -83,8 +83,8 @@ export default async function handler(req,res){
    if(!['new','upgrade'].includes(b.kind)||!Array.isArray(b.rows)||b.rows.length<1||b.rows.length>5000)
      return res.status(400).json({error:'Invalid report type or size (maximum 5,000 rows)'});
    for(const r of b.rows){
-     if(typeof r!=='object'||r===null||!/^\\d{6,15}$/.test(String(r.subscriber||''))||
-       !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(r.sale_date||''))||
+     if(typeof r!=='object'||r===null||!/^[0-9]{6,15}$/.test(String(r.subscriber||''))||
+       !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(r.sale_date||''))||
        String(r.tag_agent_id||'').length>100||String(r.tag_pay_desk||'').length>100)
        return res.status(400).json({error:'Invalid report row'});
    }
