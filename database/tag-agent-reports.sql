@@ -102,6 +102,5 @@ returns table(sale_id text,status text) language sql stable security definer set
 $$;
 revoke all on function public.tracker_tag_statuses() from public,anon;
 grant execute on function public.tracker_tag_statuses() to authenticated;
-notify pgrst, 'reload schema';
 commit;
 notify pgrst, 'reload schema';
