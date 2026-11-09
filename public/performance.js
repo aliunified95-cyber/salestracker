@@ -1,7 +1,7 @@
 /* Presentation-only metrics. Saved sales, category targets and calculation rules are not changed. */
 (function(root){
   const number=value=>Number.isFinite(Number(value))?Number(value):0;
-  const points=(postpaid,broadband)=>(number(postpaid)+number(broadband))/2;
+  const points=(postpaid,broadband)=>number(postpaid)+number(broadband);
   const achievement=(sales,target)=>number(target)>0?number(sales)/number(target)*100:null;
   const weightedAchievement=(postpaid,postpaidTarget,broadband,broadbandTarget)=>{
     const a=achievement(postpaid,postpaidTarget),b=achievement(broadband,broadbandTarget);
