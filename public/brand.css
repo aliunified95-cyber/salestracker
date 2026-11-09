@@ -103,3 +103,26 @@ input:focus,select:focus{outline:2px solid #c4b5fd;border-color:var(--p2)}
 .tag-ok{color:var(--grn)}.tag-missing{color:var(--red)}
 #tagUploadDialog input[type=file]{width:100%;display:block;margin-top:8px}
 #tagUploadStatus{min-height:26px;white-space:pre-wrap}
+
+
+/* Team Overview: all metrics visible in responsive cards, without internal scrolling. */
+#teamTable{max-height:none!important;overflow:visible!important}
+#teamTable table.enhanced-team{display:block;width:100%;min-width:0!important;background:transparent}
+#teamTable table.enhanced-team thead{display:none!important}
+#teamTable table.enhanced-team tbody{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(min(100%,350px),1fr));gap:12px;align-items:stretch}
+#teamTable table.enhanced-team tr{display:flex!important;flex-direction:column;min-width:0;margin:0!important;padding:12px 14px!important;border:1px solid var(--line);border-radius:10px;background:white}
+#teamTable table.enhanced-team td{display:flex!important;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0!important;border-bottom:1px solid var(--line);white-space:normal;text-align:right}
+#teamTable table.enhanced-team td:first-child{justify-content:flex-start;text-align:left;flex-wrap:wrap;font-size:15px}
+#teamTable table.enhanced-team td:last-child{border-bottom:0}
+#teamTable table.enhanced-team td:before{color:var(--mut);font-size:12px;font-weight:500;text-align:left;flex:0 1 55%;white-space:normal}
+#teamTable table.enhanced-team td:nth-child(2):before{content:"Sales"}
+#teamTable table.enhanced-team td:nth-child(3):before{content:"Postpaid points / target"}
+#teamTable table.enhanced-team td:nth-child(4):before{content:"Postpaid achievement"}
+#teamTable table.enhanced-team td:nth-child(5):before{content:"Broadband points / target"}
+#teamTable table.enhanced-team td:nth-child(6):before{content:"Broadband achievement"}
+#teamTable table.enhanced-team td:nth-child(7):before{content:"Total sales points"}
+#teamTable table.enhanced-team td:nth-child(8):before{content:"Total achievement"}
+#teamTable table.enhanced-team td:nth-child(9):before{content:"Remaining to 75%"}
+#teamTable table.enhanced-team td:nth-child(10):before{content:"Month-end run rate"}
+#teamTable table.enhanced-team td.empty{justify-content:center;text-align:center}
+#teamTable table.enhanced-team td.empty:before{content:none}

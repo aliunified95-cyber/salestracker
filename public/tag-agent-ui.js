@@ -46,7 +46,7 @@
  };
  const updateUploadVisibility=()=>{
    const b=$tag('#tagUploadButton');
-   if(b)b.hidden=!isManagerOwner();
+   if(b){b.hidden=!isManagerOwner();b.disabled=raw?.tagReady===false;b.title=raw?.tagReady===false?'Database setup required: apply database/tag-agent-reports.sql in Supabase':'Upload Tag Agent report';}
  };
  const install=()=>{
    detailsDialog=document.createElement('dialog');
@@ -104,7 +104,7 @@
        status.textContent='Saved. '+summary;
        $tag('#tagCsvFiles').value='';
        updateBadge();
-     }catch(error){status.textContent='Upload failed. '+error.message;}
+     }catch(error){status.textContent='Upload failed. '+(String(error.message).includes('tracker_tag_upload')?'The Tag Agent database migration is missing. Apply database/tag-agent-reports.sql in Supabase SQL Editor.':error.message);}
      finally{button.disabled=false;}
    };
  };
