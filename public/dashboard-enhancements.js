@@ -86,7 +86,7 @@ render=function(){
   card.innerHTML=`<span class="tag">TOTAL · 50% POSTPAID + 50% BROADBAND</span><div class="stats"><div><small>Target (average points)</small><strong>${valid?f(target):'—'}</strong></div><div><small>Sales (average points)</small><strong>${f(p)}</strong></div><div><small>Achievement</small><strong style="color:${color}">${percent(score)}</strong></div></div><div class="bar"><i style="width:${Math.min(Math.max(score||0,0),100)}%;background:${color}"></i><u style="left:75%"></u></div><div class="ms"><span style="left:75%">75%</span><span>100%</span></div><div class="kf"><span>${f(p)} / ${valid?f(target):'—'} average points</span><span style="color:${color}">${remainder}</span></div>`;
  }
  // The category cards retain 100%-target remaining points; append 75%-milestone progress.
- cards.slice(0,2).forEach((card,i)=>{
+ Array.from(cards).slice(0,2).forEach((card,i)=>{
   const value=i===0?m.post:m.bb,target=i===0?t.postpaid:t.broadband;
   const gap=pm.to75(value,target);let marker=card.querySelector('.milestone');
   if(!marker){marker=document.createElement('p');marker.className='milestone sub';card.appendChild(marker)}
