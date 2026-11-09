@@ -95,7 +95,7 @@ function lockMutations(){if(saving)return null;saving=true;document.querySelecto
 async function signedIn(p){
  profile=p;selectedAgent=p.role==='manager'?'all':p.id;
  if(p.must_change_pin){document.querySelector('#pinReason').textContent='Change your temporary PIN before using your dashboard.';document.querySelector('#cancelPin').textContent='Sign out';document.querySelector('#pinDialog').showModal();return}
- await reload();document.querySelector('#auth').hidden=true;document.querySelector('#app').hidden=false;
+ await reload();document.querySelector('#auth').hidden=true;document.querySelector('#app').hidden=false;document.querySelector('#sessionLoading').hidden=true;
 }
 async function start(){
  for(const type of ['click','submit','change','keydown'])document.addEventListener(type,e=>{if(saving){e.preventDefault();e.stopImmediatePropagation()}},true);
@@ -125,7 +125,7 @@ async function start(){
  document.querySelector('#userForm').onsubmit=async e=>{e.preventDefault();try{await api('users',{action:'create',username:document.querySelector('#newUser').value,display_name:document.querySelector('#newName').value,pin:document.querySelector('#userPin').value,role:document.querySelector('#newRole').value});document.querySelector('#userForm').reset();await reload();userList();toast('Account created. Share the temporary PIN with this agent.')}catch(e){document.querySelector('#userError').textContent=e.message}};
  document.querySelector('#usersList').onclick=async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.reset){resetUser=b.dataset.reset;document.querySelector('#resetName').textContent=resetUser;document.querySelector('#resetDialog').showModal()}if(b.dataset.toggle){try{await api('users',{action:'toggle',username:b.dataset.toggle});await reload();userList()}catch(e){toast(e.message,'err')}}if(b.dataset.role){try{await api('users',{action:'setrole',username:b.dataset.role,role:b.dataset.next});await reload();userList();toast('Role updated')}catch(e){toast(e.message,'err')}}};
  document.querySelector('#resetForm').onsubmit=async e=>{e.preventDefault();try{await api('users',{action:'reset',username:resetUser,pin:document.querySelector('#resetPin').value});document.querySelector('#resetForm').reset();document.querySelector('#resetDialog').close();await reload();userList();toast('Temporary PIN reset')}catch(e){document.querySelector('#resetError').textContent=e.message}};
- try{const h=await api('health');document.querySelector('#connection').textContent=h.configured?'':'Setup pending: the secure database connection has not been configured.';if(!h.configured)return;const {profile:p}=await api('session');await signedIn(p)}catch(e){if(e.message!=='Please sign in')document.querySelector('#connection').textContent=e.message}
+ try{const h=await api('health');document.querySelector('#connection').textContent=h.configured?'':'Setup pending: the secure database connection has not been configured.';if(!h.configured){document.querySelector('#auth').hidden=false;return}const {profile:p}=await api('session');await signedIn(p)}catch(e){if(e.message!=='Please sign in')document.querySelector('#connection').textContent=e.message;document.querySelector('#auth').hidden=false}finally{document.querySelector('#sessionLoading').hidden=true}
 }
 
 
