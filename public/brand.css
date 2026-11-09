@@ -83,3 +83,12 @@ input:focus,select:focus{outline:2px solid #c4b5fd;border-color:var(--p2)}
 .tiles{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:760px){.tiles{grid-template-columns:1fr}}
 #teamTable{max-height:none;overflow:visible}#teamTable table{min-width:0}@media(max-width:1000px){#teamTable table,#teamTable tbody,#teamTable tr,#teamTable td{display:block}#teamTable thead{display:none}#teamTable tr{border:1px solid var(--line);border-radius:8px;margin-bottom:10px;padding:6px 10px}#teamTable td{display:flex;justify-content:space-between;gap:12px;white-space:normal;padding:7px 0}#teamTable td:before{color:var(--mut);font-size:12px}#teamTable td:nth-child(2):before{content:"Sales"}#teamTable td:nth-child(3):before{content:"Postpaid points / target"}#teamTable td:nth-child(4):before{content:"Postpaid achievement"}#teamTable td:nth-child(5):before{content:"Broadband points / target"}#teamTable td:nth-child(6):before{content:"Broadband achievement"}}
 
+
+/* November 2026 performance release */
+#runRatePanel .tiles,#dailySalesPanel .tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+#dailySalesPanel h3{font-size:14px;margin:18px 0 8px}#dailySalesPanel label{margin:0}
+#dailySalesPanel .daily-table{min-width:570px}#teamTable{overflow-x:auto}#teamTable table.enhanced-team{min-width:1320px}
+#releaseDialog{width:min(560px,calc(100% - 24px))}#releaseDialog .release-list{line-height:1.6;padding-left:20px}#releaseDialog li{margin:10px 0}
+.milestone{margin:8px 0 0;font-size:12px;font-weight:600}
+@media(max-width:1000px){#teamTable table.enhanced-team{min-width:0}#teamTable td:nth-child(7):before{content:"Total points (average)"}#teamTable td:nth-child(8):before{content:"Total achievement"}#teamTable td:nth-child(9):before{content:"Remaining to 75%"}#teamTable td:nth-child(10):before{content:"Month-end run rate"}}
+@media(max-width:760px){#runRatePanel .tiles,#dailySalesPanel .tiles{grid-template-columns:1fr}}
