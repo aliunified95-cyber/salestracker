@@ -37,3 +37,20 @@ If environment variables are absent, the site reports setup pending and rejects 
 ## Asset source
 
 Zain logo: https://www.bh.zain.com/assets/zain-logo.svg, from the official Zain Bahrain website. Original Target 11.html is read only and is not included in the published website.
+
+## November 2026: detailed sales and Tag Agent reconciliation
+
+Sales points are absolute: **total points = Postpaid points + Broadband points**. Achievement percentage remains equal category weighting: **(Postpaid achievement % + Broadband achievement %) / 2**. Selecting any KPI card opens a date-descending list of the underlying orders, subscriber numbers, sale types, points and Tag Agent status.
+
+Only the AM791 manager can upload Tag Agent CSV reports. The `TLS_REPORT.csv` form is treated as new sales, and `TLS_MIG_REPOERT.csv` as upgrades. Header-based classification is supported: a migration report contains `OLD_PACKAGE` or `NEW_PACKAGE`. File column names are case-insensitive. The required headers are `SUBNO`, `transdate`, `tag_agent_id` and `tag_pay_desk`. The parser accepts `02-NOV-26` or `YYYY-MM-DD` dates, quoted CSV fields and leading Bahrain +973 prefixes.
+
+**Required one-time database migration:** Run `database/tag-agent-reports.sql` in the existing Sales Tracker Supabase project's SQL Editor. Review the script and use the correct project. This migration adds only Tag Agent tables and secured RPCs; it does not change existing sales, targets or rules. Until applied, Tag Agent is marked Unavailable. The upload action is accessible only to AM791 and must not bypass sign-in.
+
+Upload reports covering the requested days. Each upload atomically replaces the reconciliation data for its own type and included dates, without changing other dates or the second report type. Agent and manager views display:
+- Yes: a matching subscriber and date is covered by the relevant report, with `tag_agent_id` or `tag_pay_desk` populated.
+- No: the relevant report type has been uploaded for the date, but the subscriber is absent or its tag fields are blank.
+- NA: the relevant report type has not been uploaded for that date, including newer sales not covered by any upload.
+
+The dashboard Tag Agent button counts only **No** for the selected agent/team and selected month. Agents can inspect only their own sales; managers can inspect team sales. Report data and subscriber numbers must never be committed to the repository. Use the two uploaded CSV files through the authenticated interface after applying the migration.
+
+This is not an exhaustive match on order number: the tag reports do not contain the tracker's unique order ID. Reconciliation is on normalized subscriber number, transaction date and new-sale/upgrade report type. Review any subscriber with multiple orders of the same sale type on a day.
