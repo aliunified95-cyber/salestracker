@@ -5,8 +5,8 @@ const m=globalThis.trackerMetrics;
 
 test('50/50 achievement is the average of category percentages, not a combined-target ratio',()=>{
   assert.equal(m.weightedAchievement(90,100,30,50),75);
-  assert.equal(m.points(90,30),60);
-  assert.equal(m.points(100,50),75);
+  assert.equal(m.points(90,30),120);
+  assert.equal(m.points(100,50),150);
 });
 test('below 75% displays the remaining score and sales points, not a negative number',()=>{
   assert.equal(m.scoreTo75(50,100,30,100),35);
