@@ -92,3 +92,5 @@ input:focus,select:focus{outline:2px solid #c4b5fd;border-color:var(--p2)}
 .milestone{margin:8px 0 0;font-size:12px;font-weight:600}
 @media(max-width:1000px){#teamTable table.enhanced-team{min-width:0}#teamTable td:nth-child(7):before{content:"Total points (average)"}#teamTable td:nth-child(8):before{content:"Total achievement"}#teamTable td:nth-child(9):before{content:"Remaining to 75%"}#teamTable td:nth-child(10):before{content:"Month-end run rate"}}
 @media(max-width:760px){#runRatePanel .tiles,#dailySalesPanel .tiles{grid-template-columns:1fr}}
+
+.session-loading{min-height:100vh;display:grid;place-items:center;color:var(--p);font-weight:600;background:var(--bg)}
