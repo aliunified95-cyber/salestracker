@@ -54,7 +54,8 @@ export default async function handler(req,res){
   if(route==='state'&&req.method==='GET'){
    const allRows=async t=>{const result=[];for(let offset=0;;offset+=1000){const rows=await sb(`/rest/v1/${t}?select=*&order=${t==='tracker_targets'?'agent_id,month':['tracker_team_targets','tracker_team_arpu'].includes(t)?'month':'id'}&limit=1000&offset=${offset}`,{token});result.push(...rows);if(rows.length<1000)return result}};
    const [profiles,sales,targets,rules,teamTargets,teamArpu]=await Promise.all(['tracker_profiles','tracker_sales','tracker_targets','tracker_rules','tracker_team_targets','tracker_team_arpu'].map(allRows));
-   return res.status(200).json({profiles,sales,targets,rules,teamTargets,teamArpu});
+   const tagStatuses=await rpc('tracker_tag_statuses',{},token).catch(()=>null);
+   return res.status(200).json({profiles,sales,targets,rules,teamTargets,teamArpu,tagStatuses:tagStatuses||[],tagReady:tagStatuses!==null});
   }
   if(route==='team-arpu'&&post){if(!['manager','admin'].includes(profile.role))return res.status(403).json({error:'Rules access required'});if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(b.month))throw new Error('Choose a valid month');const record={};for(const k of ['postpaidArpu','mbbArpu','fiberArpu','hbbArpu']){if(typeof b[k]!=='number'||!Number.isFinite(b[k])||b[k]<=0)throw new Error('Enter a value above zero for each ARPU');record[k]=b[k]}await sb('/rest/v1/tracker_team_arpu?on_conflict=month',{method:'POST',token,body:{month:b.month,record},prefer:'resolution=merge-duplicates,return=representation'});return res.status(200).json({ok:true})}
   if(route==='team-target'&&post){
@@ -76,6 +77,19 @@ export default async function handler(req,res){
     catch(e){if(u?.id)await sb(`/auth/v1/admin/users/${u.id}`,{method:'DELETE',admin:true}).catch(()=>{});errors.push({username:name,error:'Could not create this account. Existing accounts were left unchanged.'});}
    }
    return res.status(200).json({created,skipped,errors});
+  }
+  if(route==='tag-upload'&&post){
+   if(profile.role!=='manager'||profile.username!=='AM791')return res.status(403).json({error:'AM791 manager access required'});
+   if(!['new','upgrade'].includes(b.kind)||!Array.isArray(b.rows)||b.rows.length<1||b.rows.length>5000)
+     return res.status(400).json({error:'Invalid report type or size (maximum 5,000 rows)'});
+   for(const r of b.rows){
+     if(typeof r!=='object'||r===null||!/^\\d{6,15}$/.test(String(r.subscriber||''))||
+       !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(r.sale_date||''))||
+       String(r.tag_agent_id||'').length>100||String(r.tag_pay_desk||'').length>100)
+       return res.status(400).json({error:'Invalid report row'});
+   }
+   const result=await rpc('tracker_tag_upload',{kind:b.kind,entries:b.rows},token);
+   return res.status(200).json({ok:true,result});
   }
   if(route==='save'&&post){if(!Array.isArray(b.changes)||b.changes.length>2000)return res.status(400).json({error:'Too many changes'});await rpc('tracker_save',{changes:b.changes},token);return res.status(200).json({ok:true})}
   if(route==='import'&&post){if(profile.role!=='manager')return res.status(403).json({error:'Manager access required'});await rpc('tracker_import',{agent:b.agent,backup:b.backup},token);return res.status(200).json({ok:true})}
