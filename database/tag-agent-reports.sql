@@ -41,8 +41,7 @@ begin
  -- Validate all rows before deleting any existing data.
  for item in select value from jsonb_array_elements(entries) loop
    if coalesce(item->>'subscriber','') !~ '^[0-9]{6,15}$'
-      or coalesce(item->>'sale_date','') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}
-      or length(coalesce(item->>'tag_agent_id',''))>100
+      or coalesce(item->>'sale_date','') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}      or length(coalesce(item->>'tag_agent_id',''))>100
       or length(coalesce(item->>'tag_pay_desk',''))>100
      then raise exception 'Invalid report entry';end if;
    d:=(item->>'sale_date')::date;
@@ -102,6 +101,7 @@ returns table(sale_id text,status text) language sql stable security definer set
 $$;
 revoke all on function public.tracker_tag_statuses() from public,anon;
 grant execute on function public.tracker_tag_statuses() to authenticated;
+notify pgrst, 'reload schema';
 commit;
 
       or length(coalesce(item->>'tag_agent_id',''))>100
@@ -148,11 +148,14 @@ returns table(sale_id text,status text) language sql stable security definer set
     and (s.agent_id=auth.uid() or tracker_private.manager())
  )
  select e.id,
- case when r.subscriber is null then 'NA'
+ case when coverage.sale_date is null then 'NA'
       when nullif(btrim(r.tag_agent_id),'') is not null
         or nullif(btrim(r.tag_pay_desk),'') is not null then 'Yes'
       else 'No' end
  from eligible e
+ left join public.tracker_tag_coverage coverage
+ on coverage.report_type=case when e.record->>'saleType'='upgrade' then 'upgrade' else 'new' end
+ and coverage.sale_date=(e.record->>'date')::date
  left join public.tracker_tag_rows r
  on r.report_type=case when e.record->>'saleType'='upgrade' then 'upgrade' else 'new' end
  and r.sale_date=(e.record->>'date')::date
