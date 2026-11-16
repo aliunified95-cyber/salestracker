@@ -198,16 +198,16 @@ function chart(ms){
   const [y,mo]=view.split('-').map(Number),dim=new Date(y,mo,0).getDate(),cur=view===today().slice(0,7);
   const last=cur?Math.max(new Date().getDate(),...ms.map(x=>+x.date.slice(8))):dim,mode=S.settings.trend;
   const ser=[['Postpaid','#4c1d95'],['Broadband','#0891b2']].filter(s=>mode==='both'||mode===s[0]);
-  const data=ser.map(([n])=>{let c=0;return Array.from({length:last},(_,i)=>{c+=total(ms.filter(x=>+x.date.slice(8)===i+1&&catOf(x.segment)===n));return c})});
-  const mx=Math.max(0,...data.flat()),step=[.5,1,2,5,10,20,25,50,100,200,250,500,1000].find(n=>n*4>=mx)||Math.ceil(mx/4),top=step*4;
+  const data=ser.map(([n])=>Array.from({length:last},(_,i)=>ms.filter(x=>+x.date.slice(8)===i+1&&catOf(x.segment)===n).length));
+  const mx=Math.max(0,...data.flat()),step=[1,2,5,10,20,25,50,100,200,250,500,1000].find(n=>n*4>=mx)||Math.max(1,Math.ceil(mx/4)),top=step*4;
   const W=800,H=250,L=38,R=12,T=12,B=26,X=d=>L+(d-1)/(dim-1)*(W-L-R),Y=v=>T+(1-v/top)*(H-T-B);
   let g='';
   for(let i=0;i<=4;i++){const v=step*i;g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#ece9f5"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end">${f(v)}</text>`}
   [1,5,10,15,20,25,dim].forEach(d=>{g+=`<text x="${X(d)}" y="${H-8}" text-anchor="middle">${d}</text>`});
   ser.forEach(([n,c],k)=>{const a=data[k];
     g+=`<path d="${a.map((v,i)=>(i?'L':'M')+X(i+1).toFixed(1)+' '+Y(v).toFixed(1)).join('')}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round"/>`;
-    g+=a.map((v,i)=>`<circle cx="${X(i+1).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3" fill="${c}"><title>${n}, day ${i+1}: ${f(v)} points</title></circle>`).join('')});
-  return `<div class="leg">${ser.map(([n,c])=>`<span><i style="background:${c}"></i>${n}</span>`).join('')}</div><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;font-size:11px;fill:#6b6880" role="img" aria-label="Cumulative daily points">${g}</svg>`;
+    g+=a.map((v,i)=>`<circle cx="${X(i+1).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3" fill="${c}"><title>${n}, day ${i+1}: ${v} sale${v===1?'':'s'}</title></circle>`).join('')});
+  return `<div class="leg">${ser.map(([n,c])=>`<span><i style="background:${c}"></i>${n}</span>`).join('')}</div><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;font-size:11px;fill:#6b6880" role="img" aria-label="Number of sales recorded each day by category">${g}</svg>`;
 }
 
 function rows(){
