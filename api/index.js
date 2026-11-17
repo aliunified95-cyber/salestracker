@@ -1,4 +1,5 @@
 import {createHash,randomInt} from 'node:crypto';
+import {missingTagCandidates,reconcileTagStatuses} from './tag-agent-match.js';
 const TEAM_USERS=['BF01387','BF01049','BF01525','BF01437','BF01545','BF01539','BF01484','BF01565','BF01278','BF01171','BF01441'];
 const username=v=>String(v||'').trim().toUpperCase();
 const validName=v=>/^[A-Z0-9_]{3,30}$/.test(v);
@@ -63,7 +64,23 @@ export default async function handler(req,res){
      }
      throw new Error('Too many sales for Tag Agent status lookup');
    })().catch(()=>null);
-   return res.status(200).json({profiles,sales,targets,rules,teamTargets,teamArpu,tagStatuses:tagStatuses||[],tagReady:tagStatuses!==null});
+   let verifiedTagStatuses=tagStatuses;
+   if(tagStatuses?.length){
+     const subscribers=missingTagCandidates(sales,tagStatuses);
+     if(subscribers.length){
+       const reportRows=[];
+       // Query only subscriber numbers already visible in the caller's sales records.
+       // Imported report rows stay server-side; the response contains statuses only.
+       for(let i=0;i<subscribers.length;i+=50){
+         const group=subscribers.slice(i,i+50);
+         const values=group.map(v=>'"'+v+'"').join(',');
+         const rows=await sb('/rest/v1/tracker_tag_rows?select=subscriber,sale_date,report_type,tag_agent_id,tag_pay_desk&subscriber=in.('+encodeURIComponent(values)+')&limit=5000',{admin:true});
+         reportRows.push(...rows);
+       }
+       verifiedTagStatuses=reconcileTagStatuses(sales,tagStatuses,reportRows);
+     }
+   }
+   return res.status(200).json({profiles,sales,targets,rules,teamTargets,teamArpu,tagStatuses:verifiedTagStatuses||[],tagReady:tagStatuses!==null});
   }
   if(route==='team-arpu'&&post){if(!['manager','admin'].includes(profile.role))return res.status(403).json({error:'Rules access required'});if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(b.month))throw new Error('Choose a valid month');const record={};for(const k of ['postpaidArpu','mbbArpu','fiberArpu','hbbArpu']){if(typeof b[k]!=='number'||!Number.isFinite(b[k])||b[k]<=0)throw new Error('Enter a value above zero for each ARPU');record[k]=b[k]}await sb('/rest/v1/tracker_team_arpu?on_conflict=month',{method:'POST',token,body:{month:b.month,record},prefer:'resolution=merge-duplicates,return=representation'});return res.status(200).json({ok:true})}
   if(route==='team-target'&&post){
